@@ -1,20 +1,22 @@
 package com.robiulsunyemon.auth_service.service.impl;
+import com.robiulsunyemon.auth_service.config.RabbitMQConfig;
+import com.robiulsunyemon.auth_service.dto.EmailMessage;
 import com.robiulsunyemon.auth_service.entity.OtpToken;
 import com.robiulsunyemon.auth_service.repository.OtpRepository;
 import com.robiulsunyemon.auth_service.service.OtpService;
 import lombok.AllArgsConstructor;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
-
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import java.util.Random;
 import java.util.UUID;
+
+
 
 @AllArgsConstructor
 @Service
 public class OtpServiceImpl implements OtpService {
     private OtpRepository otpRepository;
-    private JavaMailSender mailSender;
+    private final RabbitTemplate rabbitTemplate;
 
     @Override
     public void sendAndSaveOtp(String email) {
@@ -23,13 +25,17 @@ public class OtpServiceImpl implements OtpService {
         OtpToken otpToken = new OtpToken(email, otp);
         otpRepository.save(otpToken);
 
+        String subject = "Micro Wallet - Verification Code";
+        String body = "Your OTP code for verification is: " + otp + ". It is valid for 5 minutes.";
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("Micro Wallet - Verification Code");
-        message.setText("Your OTP code for verification is: " + otp + ". It is valid for 5 minutes.");
+        EmailMessage emailMessage = new EmailMessage(email, subject, body);
 
-        mailSender.send(message);
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY,
+                emailMessage
+        );
+
     }
 
 
