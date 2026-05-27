@@ -5,13 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.web.bind.annotation.*;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("api/v1/auth")
@@ -20,86 +15,114 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    ResponseEntity<GlobalResponse<AuthResponse>> createUser(@RequestBody AuthRequest authRequest,HttpServletRequest req){
-        AuthResponse authResponse=authService.createUser(authRequest);
-        GlobalResponse<AuthResponse> response=GlobalResponse.<AuthResponse>builder()
-                .statusCode(HttpStatus.CREATED.value())
-                .message("success")
-                .path(req.getRequestURI())
-                .data(authResponse)
-                .build();
-        return new ResponseEntity<>(response,HttpStatus.CREATED);
+    public ResponseEntity<GlobalResponse<AuthResponse>> createUser(
+            @RequestBody AuthRequest authRequest,
+            HttpServletRequest req) {
+
+        AuthResponse authResponse = authService.createUser(authRequest);
+        return buildSuccessResponse(
+                authResponse,
+                HttpStatus.CREATED,
+                "User registered successfully. Please verify OTP.",
+                req.getRequestURI()
+        );
     }
 
     @PostMapping("/login")
-    ResponseEntity<GlobalResponse<LoginResponse>> loginResponse(@RequestBody LoginRequest loginRequest,HttpServletRequest req){
-        GlobalResponse<LoginResponse> response=GlobalResponse.<LoginResponse>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("success")
-                .data(authService.login(loginRequest))
-                .path(req.getRequestURI())
-                .build();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<GlobalResponse<LoginResponse>> login(
+            @RequestBody LoginRequest loginRequest,
+            HttpServletRequest req) {
+
+        LoginResponse loginResponse = authService.login(loginRequest);
+        return buildSuccessResponse(
+                loginResponse,
+                HttpStatus.OK,
+                "Login successful",
+                req.getRequestURI()
+        );
     }
 
     @PostMapping("/verify-signup")
-    ResponseEntity<GlobalResponse<String>> verifyOtp(@RequestBody OtpVerifyRequest otpVerifyRequest,HttpServletRequest req){
-        GlobalResponse<String> response=GlobalResponse.<String>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("success")
-                .path(req.getRequestURI())
-                .data(authService.verifyOtp(otpVerifyRequest))
-                .build();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<GlobalResponse<String>> verifyOtp(
+            @RequestBody OtpVerifyRequest otpVerifyRequest,
+            HttpServletRequest req) {
+
+        String result = authService.verifyOtp(otpVerifyRequest);
+        return buildSuccessResponse(
+                result,
+                HttpStatus.OK,
+                "OTP verified successfully",
+                req.getRequestURI()
+        );
     }
 
     @PostMapping("/resend-otp")
-    public ResponseEntity<GlobalResponse<Object>> resendOtp(@RequestBody EmailRequest emailRequest, HttpServletRequest servletRequest) {
-        String resultMessage = authService.resendOtp(emailRequest);
+    public ResponseEntity<GlobalResponse<String>> resendOtp(
+            @RequestBody EmailRequest emailRequest,
+            HttpServletRequest req) {
 
-        Map<String, String> dataBody = new HashMap<>();
-        dataBody.put("message", resultMessage);
-
-        GlobalResponse<Object> response = GlobalResponse.<Object>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("success")
-                .path(servletRequest.getRequestURI())
-                .data(dataBody)
-                .build();
-
-        return ResponseEntity.ok(response);
+        String result = authService.resendOtp(emailRequest);
+        return buildSuccessResponse(
+                result,
+                HttpStatus.OK,
+                "OTP resent successfully",
+                req.getRequestURI()
+        );
     }
 
     @PostMapping("/forgot-password")
-    ResponseEntity<GlobalResponse<String>> forgotPassword(@RequestBody EmailRequest emailRequest,HttpServletRequest req){
-        GlobalResponse<String> response=GlobalResponse.<String>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("success")
-                .path(req.getRequestURI())
-                .data(authService.forgotPassword(emailRequest))
-                .build();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<GlobalResponse<String>> forgotPassword(
+            @RequestBody EmailRequest emailRequest,
+            HttpServletRequest req) {
+
+        String result = authService.forgotPassword(emailRequest);
+        return buildSuccessResponse(
+                result,
+                HttpStatus.OK,
+                "Password reset OTP sent",
+                req.getRequestURI()
+        );
     }
 
     @PostMapping("/forgot-password/verify")
-    ResponseEntity<GlobalResponse<ForgetPasswordOtpVerifyResponse>> verifyForgotPasswordOtp(@RequestBody OtpVerifyRequest otpVerifyRequest,HttpServletRequest req){
-        GlobalResponse<ForgetPasswordOtpVerifyResponse> response=GlobalResponse.<ForgetPasswordOtpVerifyResponse>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("success")
-                .path(req.getRequestURI())
-                .data(authService.verifyForgotPasswordOtp(otpVerifyRequest))
-                .build();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<GlobalResponse<ForgetPasswordOtpVerifyResponse>> verifyForgotPasswordOtp(
+            @RequestBody OtpVerifyRequest otpVerifyRequest,
+            HttpServletRequest req) {
+
+        ForgetPasswordOtpVerifyResponse result = authService.verifyForgotPasswordOtp(otpVerifyRequest);
+        return buildSuccessResponse(
+                result,
+                HttpStatus.OK,
+                "OTP verified successfully",
+                req.getRequestURI()
+        );
     }
 
     @PostMapping("/reset-password")
-    ResponseEntity<GlobalResponse<String>> resetPassword(@RequestBody ResetPasswordRequest resetPasswordRequest,HttpServletRequest req){
-        GlobalResponse<String> response=GlobalResponse.<String>builder()
-                .statusCode(HttpStatus.OK.value())
-                .message("success")
-                .path(req.getRequestURI())
-                .data(authService.resetPassword(resetPasswordRequest))
+    public ResponseEntity<GlobalResponse<String>> resetPassword(
+            @RequestBody ResetPasswordRequest resetPasswordRequest,
+            HttpServletRequest req) {
+
+        String result = authService.resetPassword(resetPasswordRequest);
+        return buildSuccessResponse(
+                result,
+                HttpStatus.OK,
+                "Password reset successful",
+                req.getRequestURI()
+        );
+    }
+
+
+    private <T> ResponseEntity<GlobalResponse<T>> buildSuccessResponse(T data, HttpStatus status, String message, String path) {
+        GlobalResponse<T> response = GlobalResponse.<T>builder()
+                .statusCode(status.value())
+                .success(true)
+                .message(message)
+                .path(path)
+                .data(data)
+                .timestamp(LocalDateTime.now())
                 .build();
-        return ResponseEntity.ok(response);
+
+        return ResponseEntity.status(status).body(response);
     }
 }

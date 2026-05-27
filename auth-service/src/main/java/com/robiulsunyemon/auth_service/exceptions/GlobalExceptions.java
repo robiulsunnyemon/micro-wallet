@@ -9,7 +9,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import java.util.LinkedHashMap;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -33,36 +35,40 @@ public class GlobalExceptions {
         return buildErrorResponse("Invalid phone number or password", HttpStatus.UNAUTHORIZED, request);
     }
 
-    // DisabledException (403 Forbidden / 401 Unauthorized)
-
+    // DisabledException (401 Unauthorized)
     @ExceptionHandler(DisabledException.class)
     public ResponseEntity<GlobalResponse<Object>> handleDisabledException(DisabledException ex, HttpServletRequest request) {
         return buildErrorResponse(ex.getMessage(), HttpStatus.UNAUTHORIZED, request);
     }
 
-    // DataIntegrityViolationException (409 Conflict or 400 Bad Request)
+    // DataIntegrityViolationException (409 Conflict)
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<GlobalResponse<Object>> handleDataIntegrityViolationException(DataIntegrityViolationException ex, HttpServletRequest request) {
         String errorMessage = "Data integrity violation. The resource you are trying to create might already exist.";
         return buildErrorResponse(errorMessage, HttpStatus.CONFLICT, request);
     }
 
-
+    // Generic Exception (500 Internal Server Error)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<GlobalResponse<Object>> handleGenericException(Exception ex, HttpServletRequest request) {
         return buildErrorResponse("An unexpected error occurred. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
-
+    // Common error response builder method using the updated GlobalResponse
     private ResponseEntity<GlobalResponse<Object>> buildErrorResponse(String message, HttpStatus status, HttpServletRequest request) {
-        Map<String, Object> errorBody = new LinkedHashMap<>();
-        errorBody.put("error", message);
+        // Create error details map (for nested error information)
+        Map<String, String> errors = new HashMap<>();
+        errors.put("error", message);
 
+        // Build GlobalResponse using the factory method style
         GlobalResponse<Object> response = GlobalResponse.<Object>builder()
-                .message("failed")
                 .statusCode(status.value())
+                .success(false)
+                .message(message)  // Main error message at top level
                 .path(request.getRequestURI())
-                .data(errorBody)
+                .data(null)        // No success data on error
+                .errors(errors)    // Detailed error information
+                .timestamp(LocalDateTime.now())
                 .build();
 
         return new ResponseEntity<>(response, status);
