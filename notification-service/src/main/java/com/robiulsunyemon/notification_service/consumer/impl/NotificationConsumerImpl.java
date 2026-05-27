@@ -1,19 +1,21 @@
-package com.robiulsunyemon.auth_service.service.impl;
+package com.robiulsunyemon.notification_service.consumer.impl;
+import com.robiulsunyemon.notification_service.consumer.NotificationConsumer;
+import com.robiulsunyemon.notification_service.notification.EmailMessage;
 import lombok.AllArgsConstructor;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.mail.SimpleMailMessage;
-import com.robiulsunyemon.auth_service.dto.EmailMessage;
-import com.robiulsunyemon.auth_service.service.EmailConsumer;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Service
 @AllArgsConstructor
-public class EmailConsumerImpl implements EmailConsumer {
+public class NotificationConsumerImpl implements NotificationConsumer {
     private JavaMailSender mailSender;
+
+
+    @RabbitListener(queues = "${rabbitmq.queue}")
     @Override
     public void consumeAndSendEmail(EmailMessage message) {
-        System.out.println("Received message from RabbitMQ for email: " + message.getToEmail());
-
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
             mailMessage.setTo(message.getToEmail());

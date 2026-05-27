@@ -5,6 +5,7 @@ import com.robiulsunyemon.auth_service.entity.OtpToken;
 import com.robiulsunyemon.auth_service.repository.OtpRepository;
 import com.robiulsunyemon.auth_service.service.OtpService;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import java.util.Random;
@@ -17,6 +18,8 @@ import java.util.UUID;
 public class OtpServiceImpl implements OtpService {
     private OtpRepository otpRepository;
     private final RabbitTemplate rabbitTemplate;
+    private RabbitMQConfig rabbitMQConfig;
+
 
     @Override
     public void sendAndSaveOtp(String email) {
@@ -31,8 +34,8 @@ public class OtpServiceImpl implements OtpService {
         EmailMessage emailMessage = new EmailMessage(email, subject, body);
 
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.EXCHANGE_NAME,
-                RabbitMQConfig.ROUTING_KEY,
+                rabbitMQConfig.getEXCHANGE_NAME(),
+                rabbitMQConfig.getROUTING_KEY(),
                 emailMessage
         );
 
