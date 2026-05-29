@@ -5,7 +5,6 @@ import com.robiulsunyemon.auth_service.entity.OtpToken;
 import com.robiulsunyemon.auth_service.repository.OtpRepository;
 import com.robiulsunyemon.auth_service.service.OtpService;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import java.util.Random;
@@ -34,10 +33,12 @@ public class OtpServiceImpl implements OtpService {
         EmailMessage emailMessage = new EmailMessage(email, subject, body);
 
         rabbitTemplate.convertAndSend(
-                rabbitMQConfig.getEXCHANGE_NAME(),
-                rabbitMQConfig.getROUTING_KEY(),
+                rabbitMQConfig.getExchangeName(),
+                rabbitMQConfig.getRoutingKeyOtp(),
                 emailMessage
         );
+
+        System.out.println("successfully send otp");
 
     }
 

@@ -1,4 +1,5 @@
 package com.robiulsunyemon.auth_service.service.impl;
+import com.robiulsunyemon.auth_service.config.RabbitMQConfig;
 import com.robiulsunyemon.auth_service.dto.*;
 import com.robiulsunyemon.auth_service.entity.AccountStatus;
 import com.robiulsunyemon.auth_service.entity.UserEntity;
@@ -10,6 +11,7 @@ import com.robiulsunyemon.auth_service.service.AuthService;
 import com.robiulsunyemon.auth_service.service.OtpService;
 import com.robiulsunyemon.auth_service.utils.JwtService;
 import lombok.AllArgsConstructor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -29,6 +31,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
+    private final RabbitMQConfig rabbitMQConfig;
+    private final RabbitTemplate rabbitTemplate;
 
     @Override
     @Transactional
@@ -86,7 +90,12 @@ public class AuthServiceImpl implements AuthService {
         user.setIsVerified(true);
         user.setAccountStatus(AccountStatus.ACTIVE);
         authRepository.save(user);
-
+        UserCreatedMessage walletMessage=new UserCreatedMessage(user.getId(),user.getEmail(),user.getPhoneNumber());
+        rabbitTemplate.convertAndSend(
+                rabbitMQConfig.getExchangeName(),
+                rabbitMQConfig.getRoutingKeyWallet(),
+                walletMessage
+        );
         return "OTP verified successfully. Your account is now active.";
     }
 

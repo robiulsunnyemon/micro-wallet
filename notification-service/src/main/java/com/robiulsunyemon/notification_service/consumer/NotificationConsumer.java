@@ -5,6 +5,5 @@ import org.springframework.stereotype.Service;
 
 @Service
 public interface NotificationConsumer{
-
     void consumeAndSendEmail(EmailMessage message);
 }

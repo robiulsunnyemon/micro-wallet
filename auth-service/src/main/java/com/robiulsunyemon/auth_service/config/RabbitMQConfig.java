@@ -12,36 +12,50 @@ import org.springframework.beans.factory.annotation.Value;
 @Data
 public class RabbitMQConfig {
 
-    @Value("${rabbitmq.queue}")
-    private String QUEUE_NAME;
     @Value("${rabbitmq.exchange}")
-    private String EXCHANGE_NAME;
-    @Value("${rabbitmq.routing-key}")
-    private String ROUTING_KEY;
+    private String exchangeName;
 
+    @Value("${rabbitmq.otp_queue}")
+    private String otpQueue;
 
+    @Value("${rabbitmq.wallet_queue}")
+    private String walletQueue;
 
+    @Value("${rabbitmq.routing-key-otp}")
+    private String routingKeyOtp;
 
-    @Bean
-    public Queue queue() {
-        return new Queue(QUEUE_NAME, true);
-    }
-
-
-    @Bean
-    public TopicExchange exchange() {
-        return new TopicExchange(EXCHANGE_NAME);
-    }
-
+    @Value("${rabbitmq.routing-key-wallet}")
+    private String routingKeyWallet;
 
     @Bean
-    public Binding binding(Queue queue, TopicExchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(ROUTING_KEY);
+    public DirectExchange exchange(){
+        return new DirectExchange(exchangeName);
     }
 
+    @Bean
+    public Queue otpQueue(){
+        return new Queue(otpQueue,true);
+    }
+
+    @Bean
+    public Queue walletQueue(){
+        return new Queue(walletQueue,true);
+    }
+
+    @Bean
+    public Binding otpBinding(){
+        return BindingBuilder.bind(otpQueue()).to(exchange()).with(routingKeyOtp);
+
+    }
+
+    @Bean
+    public Binding walletBinding(){
+        return BindingBuilder.bind(walletQueue()).to(exchange()).with(routingKeyWallet);
+    }
 
     @Bean
     public MessageConverter converter() {
         return new Jackson2JsonMessageConverter();
     }
+
 }

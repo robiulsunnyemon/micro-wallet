@@ -21,7 +21,6 @@ public class NotificationConsumerImpl implements NotificationConsumer {
             mailMessage.setTo(message.getToEmail());
             mailMessage.setSubject(message.getSubject());
             mailMessage.setText(message.getBody());
-
             mailSender.send(mailMessage);
             System.out.println("Email successfully sent to " + message.getToEmail());
         } catch (Exception e) {

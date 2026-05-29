@@ -1,9 +1,7 @@
 package com.robiulsunyemon.auth_service.service;
 
 import com.robiulsunyemon.auth_service.dto.*;
-import org.springframework.stereotype.Service;
 
-@Service
 public interface AuthService {
     AuthResponse createUser(AuthRequest request);
     LoginResponse login(LoginRequest request);
