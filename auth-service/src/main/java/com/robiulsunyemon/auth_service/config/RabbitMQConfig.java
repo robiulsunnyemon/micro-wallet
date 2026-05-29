@@ -15,21 +15,36 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.exchange}")
     private String exchangeName;
 
+    @Value("${rabbitmq.topic_exchange}")
+    private String topicExchangeName;
+
+
     @Value("${rabbitmq.otp_queue}")
     private String otpQueue;
 
     @Value("${rabbitmq.wallet_queue}")
     private String walletQueue;
 
+
+    @Value("${rabbitmq.profile_queue}")
+    private String profileQueue;
+
     @Value("${rabbitmq.routing-key-otp}")
     private String routingKeyOtp;
 
-    @Value("${rabbitmq.routing-key-wallet}")
-    private String routingKeyWallet;
+
+    @Value("${rabbitmq.routing-key-topic}")
+    private String routingKeyTopic;
 
     @Bean
     public DirectExchange exchange(){
         return new DirectExchange(exchangeName);
+    }
+
+
+    @Bean
+    public TopicExchange topicExchange(){
+        return new TopicExchange(topicExchangeName);
     }
 
     @Bean
@@ -43,14 +58,26 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue profileQueue(){
+        return new Queue(profileQueue,true);
+    }
+
+
+
+    @Bean
     public Binding otpBinding(){
         return BindingBuilder.bind(otpQueue()).to(exchange()).with(routingKeyOtp);
 
     }
 
     @Bean
-    public Binding walletBinding(){
-        return BindingBuilder.bind(walletQueue()).to(exchange()).with(routingKeyWallet);
+    public Binding walletBinding(Queue walletQueue,TopicExchange exchange){
+        return BindingBuilder.bind(walletQueue).to(exchange).with(routingKeyTopic);
+    }
+
+    @Bean
+    public Binding profileBinding(Queue profileQueue,TopicExchange exchange){
+        return BindingBuilder.bind(profileQueue).to(exchange).with(routingKeyTopic);
     }
 
     @Bean

@@ -92,10 +92,11 @@ public class AuthServiceImpl implements AuthService {
         authRepository.save(user);
         UserCreatedMessage walletMessage=new UserCreatedMessage(user.getId(),user.getEmail(),user.getPhoneNumber());
         rabbitTemplate.convertAndSend(
-                rabbitMQConfig.getExchangeName(),
-                rabbitMQConfig.getRoutingKeyWallet(),
+                rabbitMQConfig.getTopicExchangeName(),
+                rabbitMQConfig.getRoutingKeyTopic(),
                 walletMessage
         );
+
         return "OTP verified successfully. Your account is now active.";
     }
 
