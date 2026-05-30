@@ -4,6 +4,9 @@ server:
 
 rabbitmq:
   queue: profile.queue
+  exchange: profile.exchange
+  rollback-queue: profile.created
+  routing-key-rollback: profile.created.rollback
 
 spring:
   application:

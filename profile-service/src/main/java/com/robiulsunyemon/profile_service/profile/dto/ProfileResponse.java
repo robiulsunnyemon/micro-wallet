@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class ProfileResponse {
     private Long id;
     private Long userId;
+    private Long walletId;
     private String firstName;
     private String lastName;
     private String address;

@@ -1,13 +1,13 @@
 package com.robiulsunyemon.wallet_service.wallet.service.impl;
-import com.robiulsunyemon.wallet_service.wallet.dto.UserCreatedMessage;
-import com.robiulsunyemon.wallet_service.wallet.dto.WalletRequest;
-import com.robiulsunyemon.wallet_service.wallet.dto.WalletResponse;
+import com.robiulsunyemon.wallet_service.wallet.config.RabbitMQConfig;
+import com.robiulsunyemon.wallet_service.wallet.dto.*;
 import com.robiulsunyemon.wallet_service.wallet.entity.WalletEntity;
 import com.robiulsunyemon.wallet_service.wallet.mapper.WalletMapper;
 import com.robiulsunyemon.wallet_service.wallet.repository.WalletRepository;
 import com.robiulsunyemon.wallet_service.wallet.service.WalletService;
 import lombok.AllArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,23 +20,64 @@ public class WalletServiceImpl implements WalletService {
 
     private WalletRepository walletRepository;
     private WalletMapper walletMapper;
-
+    private RabbitTemplate rabbitTemplate;
+    private RabbitMQConfig rabbitMQConfig;
 
     @Override
     @RabbitListener(queues = "${rabbitmq.queue}")
     public void createWallet(UserCreatedMessage userCreatedMessage) {
+        try {
+            if(walletRepository.findByUserId(userCreatedMessage.getUserId()).isPresent()) {
 
-        if(walletRepository.findByUserId(userCreatedMessage.getUserId()).isPresent()) {
-            return ;
+                Optional<WalletEntity> entity=walletRepository.findByUserId(userCreatedMessage.getUserId());
+                entity.ifPresent(walletEntity -> {
+                    WalletCreatedMessage walletCreatedMessage=new WalletCreatedMessage(userCreatedMessage.getUserId(),entity.get().getId(),userCreatedMessage.getEmail(),userCreatedMessage.getPhoneNumber());
+                    rabbitTemplate.convertAndSend(
+                            rabbitMQConfig.getEXCHANGE_NAME(),
+                            rabbitMQConfig.getROUTING_KEY(),
+                            walletCreatedMessage
+                    );
+                });
+                return ;
+            }
+
+            WalletRequest wallet=new WalletRequest();
+            wallet.setUserId(userCreatedMessage.getUserId());
+            wallet.setBalance(BigDecimal.ZERO);
+            wallet.setCurrency("BDT");
+            WalletEntity entity = walletMapper.requestToEntity(wallet);
+            WalletEntity response=walletRepository.save(entity);
+            System.out.println("Wallet successfully created for User ID: " + userCreatedMessage.getUserId());
+            WalletCreatedMessage walletCreatedMessage=new WalletCreatedMessage(userCreatedMessage.getUserId(),response.getId(),userCreatedMessage.getEmail(),userCreatedMessage.getPhoneNumber());
+            rabbitTemplate.convertAndSend(
+                    rabbitMQConfig.getEXCHANGE_NAME(),
+                    rabbitMQConfig.getROUTING_KEY(),
+                    walletCreatedMessage
+            );
+            System.out.println("successfully message send to profile service");
+
+        } catch (Exception e) {
+            System.out.println("Error occur from wallet service. No message received from auth service. because: "+e);
+            RegistrationStatusMessage rollbackMessage=new RegistrationStatusMessage(false,userCreatedMessage.getUserId());
+            rabbitTemplate.convertAndSend(rabbitMQConfig.getEXCHANGE_NAME(),rabbitMQConfig.getROLLBACK_ROUTING_KEY(),rollbackMessage);
+            throw new RuntimeException(e);
         }
+    }
 
-        WalletRequest wallet=new WalletRequest();
-        wallet.setUserId(userCreatedMessage.getUserId());
-        wallet.setBalance(BigDecimal.ZERO);
-        wallet.setCurrency("BDT");
-        WalletEntity entity = walletMapper.requestToEntity(wallet);
-        WalletEntity savedEntity = walletRepository.save(entity);
-        System.out.println("Wallet successfully created for User ID: " + userCreatedMessage.getUserId());
+    @RabbitListener(queues = "${rabbitmq.rollback-queue-profile}")
+    @Override
+    public void handleProfileRegistrationStatusUpdate(RegistrationStatusMessage statusMessage) {
+        try{
+            if (!statusMessage.getIsSucceed()){
+                Optional<WalletEntity> entity=walletRepository.findByUserId(statusMessage.getUserId());
+                entity.ifPresent(walletEntity -> walletRepository.delete(walletEntity));
+                rabbitTemplate.convertAndSend(rabbitMQConfig.getEXCHANGE_NAME(),rabbitMQConfig.getROLLBACK_ROUTING_KEY(),statusMessage);
+            }else {
+                rabbitTemplate.convertAndSend(rabbitMQConfig.getEXCHANGE_NAME(),rabbitMQConfig.getROLLBACK_ROUTING_KEY(),statusMessage);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

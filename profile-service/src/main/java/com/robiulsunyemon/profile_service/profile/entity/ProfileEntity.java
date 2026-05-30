@@ -13,21 +13,14 @@ public class ProfileEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private Long userId;
-
+    private Long walletId;
     private String firstName;
-
     private String lastName;
-
     private String address;
-
     private String nidNumber;
-
     private KycStatus kycStatus;
-
     private LocalDateTime createdAt;
-
     private LocalDateTime updatedAt;
 
     @PrePersist

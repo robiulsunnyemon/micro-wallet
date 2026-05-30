@@ -22,6 +22,7 @@ public class ProfileMapper {
         ProfileResponse response = new ProfileResponse();
         response.setId(entity.getId());
         response.setUserId(entity.getUserId());
+        response.setWalletId(entity.getWalletId());
         response.setFirstName(entity.getFirstName());
         response.setLastName(entity.getLastName());
         response.setAddress(entity.getAddress());

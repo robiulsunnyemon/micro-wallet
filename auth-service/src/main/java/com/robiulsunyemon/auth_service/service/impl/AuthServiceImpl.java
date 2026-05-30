@@ -11,6 +11,7 @@ import com.robiulsunyemon.auth_service.service.AuthService;
 import com.robiulsunyemon.auth_service.service.OtpService;
 import com.robiulsunyemon.auth_service.utils.JwtService;
 import lombok.AllArgsConstructor;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,6 +21,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @Service
 @AllArgsConstructor
@@ -76,28 +79,53 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public String verifyOtp(OtpVerifyRequest request) {
-        boolean isVerified = otpService.verifyOtp(request.getEmail(), request.getOtp());
-        if (!isVerified) {
-            throw new BadRequestException("The OTP provided is invalid or has expired.", HttpStatus.BAD_REQUEST);
+        try {
+            boolean isVerified = otpService.verifyOtp(request.getEmail(), request.getOtp());
+            if (!isVerified) {
+                throw new BadRequestException("The OTP provided is invalid or has expired.", HttpStatus.BAD_REQUEST);
+            }
+
+            UserEntity user = authRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            String.format("Account not found with email: %s", request.getEmail()),
+                            HttpStatus.NOT_FOUND
+                    ));
+
+            UserCreatedMessage walletMessage=new UserCreatedMessage(user.getId(),user.getEmail(),user.getPhoneNumber());
+            rabbitTemplate.convertAndSend(
+                    rabbitMQConfig.getExchangeName(),
+                    rabbitMQConfig.getRoutingKeyWallet(),
+                    walletMessage
+            );
+
+        } catch (Exception e) {
+            System.out.println("Error occur from auth service. No message delivery from auth service. because: "+e);
+            throw new RuntimeException(e);
         }
-
-        UserEntity user = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        String.format("Account not found with email: %s", request.getEmail()),
-                        HttpStatus.NOT_FOUND
-                ));
-
-        user.setIsVerified(true);
-        user.setAccountStatus(AccountStatus.ACTIVE);
-        authRepository.save(user);
-        UserCreatedMessage walletMessage=new UserCreatedMessage(user.getId(),user.getEmail(),user.getPhoneNumber());
-        rabbitTemplate.convertAndSend(
-                rabbitMQConfig.getTopicExchangeName(),
-                rabbitMQConfig.getRoutingKeyTopic(),
-                walletMessage
-        );
-
         return "OTP verified successfully. Your account is now active.";
+    }
+
+    @RabbitListener(queues = "${rabbitmq.rollback-queue}")
+    @Override
+    public void handleRegistrationStatusUpdate(RegistrationStatusMessage statusMessage) {
+
+        System.out.println("successfully come registration status update message");
+
+        try {
+            Optional<UserEntity> entity=authRepository.findById(statusMessage.getUserId());
+            if (!statusMessage.getIsSucceed()){
+                entity.ifPresent(authRepository::delete);
+            }else {
+                entity.ifPresent(user -> {
+                    user.setIsVerified(true);
+                    user.setAccountStatus(AccountStatus.ACTIVE);
+                    authRepository.save(user);
+                });
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
