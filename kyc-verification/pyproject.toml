@@ -1,0 +1,23 @@
+[project]
+name = "kyc-verification"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "robiulsunnyemon",email = "robiulsunyemon@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "fastapi[standard] (>=0.136.3,<0.137.0)",
+    "py-eureka-client (>=0.13.3,<0.14.0)",
+    "httpx (>=0.28.1,<0.29.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+package-mode = false

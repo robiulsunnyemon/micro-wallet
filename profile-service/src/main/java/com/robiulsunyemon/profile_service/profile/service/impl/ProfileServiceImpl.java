@@ -83,6 +83,15 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
+    public Optional<ProfileResponse> findProfileByUserId(Long id) {
+        return profileRepository.findByUserId(id)
+                .map(entity -> {
+                    ProfileResponse response = new ProfileResponse();
+                   return profileMapper.entityToResponse(entity);
+                });
+    }
+
+    @Override
     public String deleteProfileById(Long id) {
         if (profileRepository.existsById(id)) {
             profileRepository.deleteById(id);

@@ -26,6 +26,11 @@ public class ProfileController {
         return profileService.findByProfileId(id);
     }
 
+    @GetMapping("/user/kyc/verification/{userId}")
+    public Optional<ProfileResponse> getProfileByUserId(@PathVariable Long userId){
+        return profileService.findProfileByUserId(userId);
+    }
+
     @PatchMapping("/{userId}/upload-nid")
     public ResponseEntity<String> updateProfile(
             @PathVariable Long userId,
