@@ -3,7 +3,6 @@ import com.robiulsunyemon.profile_service.profile.dto.ProfileResponse;
 import com.robiulsunyemon.profile_service.profile.dto.WalletCreatedMessage;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,5 +11,5 @@ public interface ProfileService {
     List<ProfileResponse> fetchProfile();
     Optional<ProfileResponse> findByProfileId(Long id);
     String deleteProfileById(Long id);
-    ProfileResponse updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage)throws IOException;
+    void updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage);
 }

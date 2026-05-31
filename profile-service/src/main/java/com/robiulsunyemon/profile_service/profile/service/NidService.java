@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-
+import net.coobird.thumbnailator.Thumbnails;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.*;
 
 @Service
@@ -22,27 +24,23 @@ public class NidService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public NidResponseDto parseNid(MultipartFile frontImage, MultipartFile backImage) throws Exception {
+    public NidResponseDto parseNid(byte[] frontBytes, String frontType, byte[] backBytes, String backType) throws Exception {
 
         String url = geminiApiUrl + "?key=" + apiKey;
 
-        String frontBase64 = Base64.getEncoder().encodeToString(frontImage.getBytes());
-        String backBase64 = Base64.getEncoder().encodeToString(backImage.getBytes());
+        String frontBase64 = Base64.getEncoder().encodeToString(frontBytes);
+        String backBase64 = Base64.getEncoder().encodeToString(backBytes);
 
 
         Map<String, Object> requestBody = new HashMap<>();
         List<Map<String, Object>> parts = new ArrayList<>();
 
-        // Front Image Part
-        parts.add(Map.of("inlineData", Map.of("mimeType", Objects.requireNonNull(frontImage.getContentType()), "data", frontBase64)));
-        // Back Image Part
-        parts.add(Map.of("inlineData", Map.of("mimeType", Objects.requireNonNull(backImage.getContentType()), "data", backBase64)));
-        // Text Prompt Part
+        parts.add(Map.of("inlineData", Map.of("mimeType", Objects.requireNonNull(frontType), "data", frontBase64)));
+        parts.add(Map.of("inlineData", Map.of("mimeType", Objects.requireNonNull(backType), "data", backBase64)));
         parts.add(Map.of("text", "Extract the Name (English and Bangla), NID Number, Date of Birth, and Address from these Bangladeshi NID card images. Be accurate."));
 
         requestBody.put("contents", List.of(Map.of("parts", parts)));
 
-        // ৩. Structured Output Configuration (JSON Schema)
         Map<String, Object> jsonSchema = Map.of(
                 "type", "OBJECT",
                 "properties", Map.of(
