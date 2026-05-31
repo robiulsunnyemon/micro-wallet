@@ -10,7 +10,9 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "fastapi[standard] (>=0.136.3,<0.137.0)",
     "py-eureka-client (>=0.13.3,<0.14.0)",
-    "httpx (>=0.28.1,<0.29.0)"
+    "httpx (>=0.28.1,<0.29.0)",
+    "deepface (>=0.0.100,<0.0.101)",
+    "tf-keras (>=2.21.0,<3.0.0)",
 ]
 
 
