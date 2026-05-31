@@ -4,6 +4,8 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 src/main/resources/application.yml
+google_vission_api.json
+src/main/resources/**
 ### STS ###
 .apt_generated
 .classpath

@@ -15,8 +15,11 @@ public class ProfileEntity {
     private Long id;
     private Long userId;
     private Long walletId;
-    private String firstName;
-    private String lastName;
+    private String nameEn;
+    private String nameBn;
+    private String nidFrontSide;
+    private String nidBackSide;
+    private LocalDateTime dateOfBirth;
     private String address;
     private String nidNumber;
     private KycStatus kycStatus;

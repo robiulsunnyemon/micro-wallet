@@ -1,30 +1,37 @@
 package com.robiulsunyemon.profile_service.profile.service.impl;
 import com.robiulsunyemon.profile_service.profile.config.RabbitMQConfig;
-import com.robiulsunyemon.profile_service.profile.dto.ProfileResponse;
-import com.robiulsunyemon.profile_service.profile.dto.RegistrationStatusMessage;
-import com.robiulsunyemon.profile_service.profile.dto.WalletCreatedMessage;
+import com.robiulsunyemon.profile_service.profile.dto.*;
 import com.robiulsunyemon.profile_service.profile.entity.KycStatus;
 import com.robiulsunyemon.profile_service.profile.entity.ProfileEntity;
 import com.robiulsunyemon.profile_service.profile.mapper.ProfileMapper;
 import com.robiulsunyemon.profile_service.profile.repository.ProfileRepository;
+import com.robiulsunyemon.profile_service.profile.service.NidService;
 import com.robiulsunyemon.profile_service.profile.service.ProfileService;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
-
+import org.springframework.web.multipart.MultipartFile;
+import java.awt.*;
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+
+
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ProfileServiceImpl implements ProfileService {
 
-    private ProfileRepository profileRepository;
-    private ProfileMapper profileMapper;
-    private RabbitTemplate rabbitTemplate;
-    private RabbitMQConfig rabbitMQConfig;
+    private final ProfileRepository profileRepository;
+    private final ProfileMapper profileMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final RabbitMQConfig rabbitMQConfig;
+    private final NidService nidService;
+
+
 
     @RabbitListener(queues = "${rabbitmq.queue}")
     @Override
@@ -77,4 +84,28 @@ public class ProfileServiceImpl implements ProfileService {
         }
         return "Profile not found";
     }
+
+    @Override
+    public ProfileResponse updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage) throws IOException {
+        try {
+            NidResponseDto nidResponseDto = nidService.parseNid(frontImage, backImage);
+
+            Optional<ProfileEntity> profileEntityOpt = profileRepository.findByUserId(userId);
+
+            return profileEntityOpt.map(entity -> {
+                entity.setNidNumber(nidResponseDto.getNidNumber());
+                entity.setNameEn(nidResponseDto.getNameEn());
+                entity.setNameBn(nidResponseDto.getNameBn());
+                entity.setDateOfBirth(LocalDate.parse(nidResponseDto.getDateOfBirth()).atStartOfDay());
+                entity.setAddress(nidResponseDto.getAddress());
+                return profileMapper.entityToResponse(profileRepository.save(entity));
+            }).orElse(null);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update profile with NID: " + e.getMessage(), e);
+        }
+
+
+    }
+
 }

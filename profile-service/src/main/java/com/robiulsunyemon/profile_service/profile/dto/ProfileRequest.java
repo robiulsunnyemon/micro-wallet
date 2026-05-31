@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 @Data
 public class ProfileRequest {
     private Long userId;
-    private String firstName;
-    private String lastName;
+    private String nameEn;
+    private String nameBn;
     private String address;
     private String nidNumber;
     private KycStatus kycStatus;

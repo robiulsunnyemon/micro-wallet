@@ -10,8 +10,8 @@ public class ProfileMapper {
     public ProfileEntity requestToEntity (ProfileRequest request){
         ProfileEntity newEntity = new ProfileEntity();
         newEntity.setUserId(request.getUserId());
-        newEntity.setFirstName(request.getFirstName());
-        newEntity.setLastName(request.getLastName());
+        newEntity.setNameEn(request.getNameEn());
+        newEntity.setNameBn(request.getNameBn());
         newEntity.setAddress(request.getAddress());
         newEntity.setNidNumber(request.getNidNumber());
         newEntity.setKycStatus(request.getKycStatus());
@@ -23,8 +23,11 @@ public class ProfileMapper {
         response.setId(entity.getId());
         response.setUserId(entity.getUserId());
         response.setWalletId(entity.getWalletId());
-        response.setFirstName(entity.getFirstName());
-        response.setLastName(entity.getLastName());
+        response.setNameEn(entity.getNameEn());
+        response.setNameBn(entity.getNameBn());
+        response.setNidFrontSide(entity.getNidFrontSide());
+        response.setNidBackSide(entity.getNidBackSide());
+        response.setDateOfBirth(entity.getDateOfBirth());
         response.setAddress(entity.getAddress());
         response.setNidNumber(entity.getNidNumber());
         response.setKycStatus(entity.getKycStatus());
