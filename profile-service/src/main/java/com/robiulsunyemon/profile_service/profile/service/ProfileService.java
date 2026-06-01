@@ -13,4 +13,5 @@ public interface ProfileService {
     Optional<ProfileResponse> findProfileByUserId(Long id);
     String deleteProfileById(Long id);
     void updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage);
+    void kycVerificationWithNid(Long userId, MultipartFile selfie);
 }

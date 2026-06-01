@@ -72,7 +72,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
 
-        String token = jwtService.generateToken(user.getPhoneNumber(), user.getRole());
+        String token = jwtService.generateToken(user.getPhoneNumber(), user.getRole(),user.getId());
         return new LoginResponse("Bearer", token);
     }
 

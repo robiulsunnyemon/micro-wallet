@@ -6,10 +6,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
-import net.coobird.thumbnailator.Thumbnails;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.*;
 
 @Service

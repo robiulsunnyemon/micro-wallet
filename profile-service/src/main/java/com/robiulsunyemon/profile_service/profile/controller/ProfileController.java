@@ -20,29 +20,32 @@ public class ProfileController {
         return profileService.fetchProfile();
     }
 
-
-    @GetMapping("/{id}")
-    public Optional<ProfileResponse> getProfileById(@PathVariable Long id){
-        return profileService.findByProfileId(id);
+    @GetMapping("/me")
+    public ResponseEntity<Optional<ProfileResponse>> getProfileInfo(
+            @RequestHeader(value = "userId", required = false) Long userId) {
+        return ResponseEntity.ok(profileService.findProfileByUserId(userId));
     }
 
-    @GetMapping("/user/kyc/verification/{userId}")
-    public Optional<ProfileResponse> getProfileByUserId(@PathVariable Long userId){
-        return profileService.findProfileByUserId(userId);
-    }
 
-    @PatchMapping("/{userId}/upload-nid")
+    @PatchMapping("/nid-submit")
     public ResponseEntity<String> updateProfile(
-            @PathVariable Long userId,
             @RequestParam("frontImage") MultipartFile frontImage,
-            @RequestParam("backImage") MultipartFile backImage) {
+            @RequestParam("backImage") MultipartFile backImage,
+            @RequestHeader(value = "userId", required = false) Long userId
+    ) {
 
         profileService.updateProfileWithNid(userId, frontImage, backImage);
         return ResponseEntity.accepted().body("NID images uploaded successfully. Processing started in background.");
     }
 
-    @DeleteMapping("/{id}")
-    public String deleteProfile(@PathVariable Long id){
-        return profileService.deleteProfileById(id);
+
+    @PostMapping("/upload-liveness")
+    public ResponseEntity<String> kycVerification(
+            @RequestParam("selfie") MultipartFile selfie,
+            @RequestHeader(value = "userId", required = false) Long userId
+    ){
+        profileService.kycVerificationWithNid(userId, selfie);
+        return ResponseEntity.accepted().body("Liveness images uploaded successfully. Processing started in background.");
     }
+
 }

@@ -1,27 +1,62 @@
-from fastapi import FastAPI
-import py_eureka_client.eureka_client as eureka_client
+import asyncio
+import logging
 from contextlib import asynccontextmanager
-from app.verification.router import router as verification_router
+import py_eureka_client.eureka_client as eureka_client
+from fastapi import FastAPI
 from app.config import settings
+from app.verification.rabbitmq_consumer import start_rabbitmq_consumer
+
+# ─── Logging Configuration ───────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s → %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
-EUREKA_SERVER = settings.EUREKA_SERVER
-APP_NAME = settings.APP_NAME
-APP_PORT = settings.APP_PORT
+# ─── Background Task Reference ───────────────────────────────────────────────
+_background_tasks: set = set()
 
+
+
+# ─── Lifespan ────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logger.info("[Lifespan] Registering with Eureka...")
     await eureka_client.init_async(
-        eureka_server=EUREKA_SERVER,
-        app_name=APP_NAME,
-        instance_port=APP_PORT,
-        instance_host="localhost"
+        eureka_server=settings.EUREKA_SERVER,
+        app_name=settings.APP_NAME,
+        instance_port=settings.APP_PORT,
+        instance_host="localhost",
     )
-    yield
-    await eureka_client.stop_async()
+    logger.info("[Lifespan] Eureka registration complete ✓")
+    logger.info("[Lifespan] Starting RabbitMQ consumer...")
+    task = asyncio.create_task(start_rabbitmq_consumer())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    logger.info("[Lifespan] RabbitMQ consumer task created ✓")
 
-app = FastAPI(lifespan=lifespan)
-app.include_router(verification_router)
+    yield  #
+    # ─── Shutdown ────────────────────────────────────────────────────────────
+    logger.info("[Lifespan] Shutdown initiated...")
+    task.cancel()
+
+    try:
+        await task
+    except asyncio.CancelledError:
+        logger.info("[Lifespan] RabbitMQ consumer stopped ✓")
+
+    await eureka_client.stop_async()
+    logger.info("[Lifespan] Eureka client stopped ✓")
+
+
+# ─── App ─────────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="KYC Verification Service",
+    lifespan=lifespan,
+)
+
 @app.get("/kyc-verification/test")
-def read_root():
-    return {"message": "Hello from FastAPI Profile Service via Eureka!"}
+def health_check():
+    return {"status": "ok", "service": settings.APP_NAME}

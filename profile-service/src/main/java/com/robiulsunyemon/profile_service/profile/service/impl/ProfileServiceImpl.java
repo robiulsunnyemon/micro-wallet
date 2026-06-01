@@ -26,7 +26,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProfileServiceImpl implements ProfileService {
@@ -132,7 +134,7 @@ public class ProfileServiceImpl implements ProfileService {
                         entity.setAddress(nidResponseDto.getAddress());
                         entity.setNidFrontSide(frontUrl);
                         entity.setNidBackSide(backUrl);
-                        entity.setKycStatus(KycStatus.PENDING);
+                        entity.setKycStatus(KycStatus.NOT_VARIFIED);
                         profileRepository.save(entity);
 
                     });
@@ -144,6 +146,48 @@ public class ProfileServiceImpl implements ProfileService {
             CompletableFuture.completedFuture(null);
         } catch (IOException e) {
             throw new RuntimeException("Failed to read image bytes", e);
+        }
+    }
+
+    @Override
+    public void kycVerificationWithNid(Long userId, MultipartFile selfie)
+
+    {
+        try {
+            byte[] selfieBytes = selfie.getBytes();
+            Map<?, ?> selfieImage = cloudinary.uploader().upload(selfieBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
+            String selfieUrl = (String) selfieImage.get("secure_url");
+
+            CompletableFuture.runAsync(() -> {
+                try {
+                    Optional<ProfileEntity> profileEntityOpt = profileRepository.findByUserId(userId);
+                    profileEntityOpt.ifPresent(entity -> {
+                        KycRequestMessage kycRequestMessage = new KycRequestMessage(
+                                userId,
+                                selfieUrl,
+                                entity.getNidFrontSide()
+                        );
+
+                        log.info("Sending KYC message: {}", kycRequestMessage);
+
+                        rabbitTemplate.convertAndSend(
+                                rabbitMQConfig.getKycPostExchange(),
+                                rabbitMQConfig.getKycPostRoutingKey(),
+                                kycRequestMessage
+                        );
+
+                        log.info("Message sent successfully");
+                    });
+                } catch (Exception e) {
+                    System.err.println("Background NID processing failed: " + e.getMessage());
+                }
+            });
+
+            CompletableFuture.completedFuture(null);
+
+        } catch (IOException e) {
+
+            throw new RuntimeException("Failed to upload the selfie to Cloudinary.", e);
         }
     }
 
