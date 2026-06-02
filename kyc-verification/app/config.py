@@ -4,8 +4,8 @@ class Settings(BaseSettings):
     EUREKA_SERVER: str
     APP_NAME: str
     APP_PORT: int
-    PROFILE_SERVICE: str
-    KYC_VERIFICATION_URL: str
+    # PROFILE_SERVICE: str
+    # KYC_VERIFICATION_URL: str
 
     RABBITMQ_HOST:str
     RABBITMQ_PORT:str

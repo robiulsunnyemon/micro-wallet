@@ -61,7 +61,18 @@ public class ProfileController {
                     "Missing userId header", request.getRequestURI());
         }
 
-        profileService.updateProfileWithNid(userId, frontImage, backImage);
+        try {
+            // main thread-এ file bytes পড়ি, কারণ @Async thread-এ MultipartFile বন্ধ হয়ে যায়
+            byte[] frontBytes = frontImage.getBytes();
+            byte[] backBytes = backImage.getBytes();
+            String frontContentType = frontImage.getContentType();
+            String backContentType = backImage.getContentType();
+            profileService.updateProfileWithNid(userId, frontBytes, frontContentType, backBytes, backContentType);
+        } catch (Exception e) {
+            return buildSuccessResponse(null, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to read uploaded files", request.getRequestURI());
+        }
+
         return buildSuccessResponse("NID images uploaded successfully. Processing started in background.",
                 HttpStatus.ACCEPTED,
                 "NID images uploaded successfully",
@@ -79,7 +90,14 @@ public class ProfileController {
                     "Missing userId header", request.getRequestURI());
         }
 
-        profileService.kycVerificationWithNid(userId, selfie);
+        try {
+            byte[] selfieBytes = selfie.getBytes();
+            profileService.kycVerificationWithNid(userId, selfieBytes);
+        } catch (Exception e) {
+            return buildSuccessResponse(null, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to read uploaded file", request.getRequestURI());
+        }
+
         return buildSuccessResponse("Liveness images uploaded successfully. Processing started in background.",
                 HttpStatus.ACCEPTED,
                 "Liveness verification started",

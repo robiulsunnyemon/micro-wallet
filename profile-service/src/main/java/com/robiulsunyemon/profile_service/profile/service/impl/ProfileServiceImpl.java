@@ -103,25 +103,20 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     @Async
-    public void updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage) {
+    public void updateProfileWithNid(Long userId, byte[] frontBytes, String frontContentType, byte[] backBytes, String backContentType) {
         try {
-            byte[] frontBytes = compressImage(frontImage);
-            byte[] backBytes = compressImage(backImage);
+            byte[] compressedFrontBytes = compressImage(frontBytes);
+            byte[] compressedBackBytes = compressImage(backBytes);
 
-            String frontContentType = frontImage.getContentType();
-            String backContentType = backImage.getContentType();
-
-
-            Map<?, ?> frontUploadResult = cloudinary.uploader().upload(frontBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
-            Map<?, ?> backUploadResult = cloudinary.uploader().upload(backBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
-
+            Map<?, ?> frontUploadResult = cloudinary.uploader().upload(compressedFrontBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
+            Map<?, ?> backUploadResult = cloudinary.uploader().upload(compressedBackBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
 
             String frontUrl = (String) frontUploadResult.get("secure_url");
             String backUrl = (String) backUploadResult.get("secure_url");
 
             CompletableFuture.runAsync(() -> {
                 try {
-                    NidResponseDto nidResponseDto = nidService.parseNid(frontBytes, frontContentType, backBytes, backContentType);
+                    NidResponseDto nidResponseDto = nidService.parseNid(compressedFrontBytes, frontContentType, compressedBackBytes, backContentType);
 
                     Optional<ProfileEntity> profileEntityOpt = profileRepository.findByUserId(userId);
                     profileEntityOpt.ifPresent(entity -> {
@@ -148,16 +143,18 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public void kycVerificationWithNid(Long userId, MultipartFile selfie)
+    public void kycVerificationWithNid(Long userId, byte[] selfieBytes)
 
     {
         try {
 
-            if(selfie==null){
+            if(selfieBytes==null || selfieBytes.length == 0){
                 System.out.println("kyc verification is failed. selfie is not found");
+                return;
             }
 
-            byte[] selfieBytes = selfie.getBytes();
+            System.out.println("kyc verification function called");
+
             Map<?, ?> selfieImage = cloudinary.uploader().upload(selfieBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
             String selfieUrl = (String) selfieImage.get("secure_url");
 
@@ -194,9 +191,9 @@ public class ProfileServiceImpl implements ProfileService {
         }
     }
 
-    public byte[] compressImage(MultipartFile file) throws IOException {
+    public byte[] compressImage(byte[] imageBytes) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        Thumbnails.of(file.getInputStream())
+        Thumbnails.of(new java.io.ByteArrayInputStream(imageBytes))
                 .size(1200, 1200)
                 .outputQuality(0.70)
                 .toOutputStream(outputStream);

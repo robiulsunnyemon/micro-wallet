@@ -1,7 +1,6 @@
 package com.robiulsunyemon.profile_service.profile.service;
 import com.robiulsunyemon.profile_service.profile.dto.ProfileResponse;
 import com.robiulsunyemon.profile_service.profile.dto.WalletCreatedMessage;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +11,6 @@ public interface ProfileService {
     ProfileResponse findByProfileId(Long id);
     ProfileResponse findProfileByUserId(Long id);
     String deleteProfileById(Long id);
-    void updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage);
-    void kycVerificationWithNid(Long userId, MultipartFile selfie);
+    void updateProfileWithNid(Long userId, byte[] frontBytes, String frontContentType, byte[] backBytes, String backContentType);
+    void kycVerificationWithNid(Long userId, byte[] selfieBytes);
 }
