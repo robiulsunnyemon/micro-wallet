@@ -70,7 +70,7 @@ public class TransactionController {
         );
     }
 
-    // আপনার WalletController এর মতো জেনেরিক রেসপন্স বিল্ডার মেথড
+
     private <T> ResponseEntity<GlobalResponse<T>> buildSuccessResponse(T data, HttpStatus status, String message, String path) {
         GlobalResponse<T> response = GlobalResponse.<T>builder()
                 .statusCode(status.value())

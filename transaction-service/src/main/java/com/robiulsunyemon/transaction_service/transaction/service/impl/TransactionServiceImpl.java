@@ -1,4 +1,5 @@
 package com.robiulsunyemon.transaction_service.transaction.service.impl;
+import com.robiulsunyemon.transaction_service.transaction.clients.WalletClient;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionRequest;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionResponse;
 import com.robiulsunyemon.transaction_service.transaction.entity.*;
@@ -27,6 +28,8 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
     private final RabbitTemplate rabbitTemplate;
     private final TransactionMapper transactionMapper;
+    private final WalletClient walletClient;
+
 
     @Value("${rabbitmq.exchange}")
     private String exchange;
@@ -39,18 +42,26 @@ public class TransactionServiceImpl implements TransactionService {
     public void createTransaction(Long userId, String roleStr, TransactionRequest request) {
         log.info("Initiating transaction for user id: {} with type: {}", userId, request.getTxType());
 
-        Role receiverRole = null;
+
+        Role senderRole = null;
         if (roleStr != null && !roleStr.isBlank()) {
-            try {
-                String cleanRole = roleStr.replace("ROLE_", "").toUpperCase().trim();
-                receiverRole = Role.valueOf(cleanRole);
-            } catch (IllegalArgumentException e) {
-                log.error("Invalid role passed from token: {}", roleStr);
-                throw new IllegalArgumentException("Invalid user role provided in request context");
-            }
-        } else {
-            log.warn("Role string is missing or empty for userId: {}", userId);
+            String cleanRole = roleStr.replace("ROLE_", "").toUpperCase().trim();
+            senderRole = Role.valueOf(cleanRole);
         }
+
+        Role receiverRole = null;
+        try {
+            String fetchedRole = walletClient.getReceiverRole(request.getReceiverUserId());
+            if (fetchedRole != null) {
+                receiverRole = Role.valueOf(fetchedRole.replace("ROLE_", "").toUpperCase().trim());
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch receiver role from wallet-service for userId: {}", request.getReceiverUserId(), e);
+            throw new ResourceNotFoundException("Wallet verification service is currently unavailable.",HttpStatus.FAILED_DEPENDENCY);
+        }
+
+        validateTransactionRules(request.getTxType(), senderRole, receiverRole);
+
 
         TransactionEntity transactionEntity = new TransactionEntity();
         transactionEntity.setUserId(userId);
@@ -188,4 +199,44 @@ public class TransactionServiceImpl implements TransactionService {
     private String generateUniqueTxId() {
         return "TX" + System.currentTimeMillis() + java.util.UUID.randomUUID().toString().substring(0, 4).toUpperCase();
     }
+
+    private void validateTransactionRules(TransactionType txType, Role senderRole, Role receiverRole) {
+        if (senderRole == null || receiverRole == null) {
+            throw new IllegalArgumentException("Sender or Receiver role could not be verified.");
+        }
+
+        switch (txType) {
+            case SEND_MONEY:
+                if (senderRole != Role.LOCAL_USER || receiverRole != Role.LOCAL_USER) {
+                    throw new IllegalArgumentException("Send Money is only allowed between Users.");
+                }
+                break;
+
+            case CASH_OUT:
+                if (senderRole != Role.LOCAL_USER || receiverRole != Role.AGENT) {
+                    throw new IllegalArgumentException("Cash Out is strictly allowed from User to Agent only.");
+                }
+                break;
+
+            case CASH_IN:
+                if (senderRole != Role.AGENT || receiverRole != Role.LOCAL_USER) {
+                    throw new IllegalArgumentException("Cash In is strictly allowed from Agent to User only.");
+                }
+                break;
+
+            case PAYMENT:
+                if (senderRole != Role.LOCAL_USER || receiverRole != Role.MERCHANT) {
+                    throw new IllegalArgumentException("Payment is only allowed from User to Merchant.");
+                }
+                break;
+
+            case MOBILE_RECHARGE:
+            case RECEIVE_REMITTANCE:
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unsupported transaction type.");
+        }
+    }
+
 }
