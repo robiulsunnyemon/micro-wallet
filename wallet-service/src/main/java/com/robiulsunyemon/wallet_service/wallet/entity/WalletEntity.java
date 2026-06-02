@@ -17,7 +17,7 @@ public class WalletEntity {
 
     private BigDecimal balance;
 
-    private String currency;
+    private CurrencyType currency;
 
     private LocalDateTime createdAt;
 

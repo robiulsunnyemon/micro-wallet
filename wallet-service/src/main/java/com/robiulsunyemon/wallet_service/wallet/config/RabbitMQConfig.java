@@ -32,6 +32,16 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.rollback-routing-key}")
     private String ROLLBACK_ROUTING_KEY;
 
+
+    @Value("${rabbitmq.transaction-exchange}")
+    private String transactionExchangeName;
+
+    @Value("${rabbitmq.transaction-wallet-queue}")
+    private String transactionWalletQueueName;
+
+    @Value("${rabbitmq.transaction-routing-key}")
+    private String transactionRoutingKey;
+
     @Bean
     public Queue queue() {
         return new Queue(QUEUE_NAME, true);
@@ -71,7 +81,24 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(rollbackQueue()).to(exchange()).with(ROLLBACK_ROUTING_KEY);
     }
 
+    @Bean
+    public Queue transactionProcessQueue() {
+        return new Queue(transactionWalletQueueName, true);
+    }
 
+
+    @Bean
+    public TopicExchange transactionTopicExchange() {
+        return new TopicExchange(transactionExchangeName);
+    }
+
+    @Bean
+    public Binding transactionProcessingBinding() {
+        return BindingBuilder
+                .bind(transactionProcessQueue())
+                .to(transactionTopicExchange())
+                .with(transactionRoutingKey);
+    }
 
     @Bean
     public MessageConverter converter() {

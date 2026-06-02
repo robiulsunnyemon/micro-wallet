@@ -1,29 +1,42 @@
 package com.robiulsunyemon.wallet_service.wallet.service.impl;
 import com.robiulsunyemon.wallet_service.wallet.config.RabbitMQConfig;
 import com.robiulsunyemon.wallet_service.wallet.dto.*;
+import com.robiulsunyemon.wallet_service.wallet.entity.CurrencyType;
+import com.robiulsunyemon.wallet_service.wallet.entity.FailureReasonType;
+import com.robiulsunyemon.wallet_service.wallet.entity.TransactionStatus;
 import com.robiulsunyemon.wallet_service.wallet.entity.WalletEntity;
 import com.robiulsunyemon.wallet_service.wallet.exceptions.ResourceNotFoundException;
 import com.robiulsunyemon.wallet_service.wallet.mapper.WalletMapper;
 import com.robiulsunyemon.wallet_service.wallet.repository.WalletRepository;
 import com.robiulsunyemon.wallet_service.wallet.service.WalletService;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
-    private WalletRepository walletRepository;
-    private WalletMapper walletMapper;
-    private RabbitTemplate rabbitTemplate;
-    private RabbitMQConfig rabbitMQConfig;
+    private final WalletRepository walletRepository;
+    private final WalletMapper walletMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final RabbitMQConfig rabbitMQConfig;
+
+    @Value("${rabbitmq.transaction-exchange}")
+    private String exchange;
+
+    @Value("${rabbitmq.transaction-rollback-routing-key}")
+    private String rollbackRoutingKey;
 
     @Override
     @RabbitListener(queues = "${rabbitmq.queue}")
@@ -33,7 +46,13 @@ public class WalletServiceImpl implements WalletService {
 
                 Optional<WalletEntity> entity=walletRepository.findByUserId(userCreatedMessage.getUserId());
                 entity.ifPresent(walletEntity -> {
-                    WalletCreatedMessage walletCreatedMessage=new WalletCreatedMessage(userCreatedMessage.getUserId(),entity.get().getId(),userCreatedMessage.getEmail(),userCreatedMessage.getPhoneNumber());
+                    WalletCreatedMessage walletCreatedMessage=
+                            new WalletCreatedMessage(
+                                    userCreatedMessage.getUserId(),
+                                    entity.get().getId(),
+                                    userCreatedMessage.getEmail(),
+                                    userCreatedMessage.getPhoneNumber()
+                            );
                     rabbitTemplate.convertAndSend(
                             rabbitMQConfig.getEXCHANGE_NAME(),
                             rabbitMQConfig.getROUTING_KEY(),
@@ -45,8 +64,8 @@ public class WalletServiceImpl implements WalletService {
 
             WalletRequest wallet=new WalletRequest();
             wallet.setUserId(userCreatedMessage.getUserId());
-            wallet.setBalance(BigDecimal.ZERO);
-            wallet.setCurrency("BDT");
+            wallet.setBalance(BigDecimal.valueOf(1000.00));
+            wallet.setCurrency(CurrencyType.BDT);
             WalletEntity entity = walletMapper.requestToEntity(wallet);
             WalletEntity response=walletRepository.save(entity);
             System.out.println("Wallet successfully created for User ID: " + userCreatedMessage.getUserId());
@@ -72,15 +91,27 @@ public class WalletServiceImpl implements WalletService {
         try{
             if (!statusMessage.getIsSucceed()){
                 Optional<WalletEntity> entity=walletRepository.findByUserId(statusMessage.getUserId());
-                entity.ifPresent(walletEntity -> walletRepository.delete(walletEntity));
-                rabbitTemplate.convertAndSend(rabbitMQConfig.getEXCHANGE_NAME(),rabbitMQConfig.getROLLBACK_ROUTING_KEY(),statusMessage);
+                entity.ifPresent(walletRepository::delete);
+                rabbitTemplate.convertAndSend(
+                        rabbitMQConfig.getEXCHANGE_NAME(),
+                        rabbitMQConfig.getROLLBACK_ROUTING_KEY(),
+                        statusMessage
+                );
             }else {
-                rabbitTemplate.convertAndSend(rabbitMQConfig.getEXCHANGE_NAME(),rabbitMQConfig.getROLLBACK_ROUTING_KEY(),statusMessage);
+                rabbitTemplate.convertAndSend(
+                        rabbitMQConfig.getEXCHANGE_NAME(),
+                        rabbitMQConfig.getROLLBACK_ROUTING_KEY(),
+                        statusMessage
+
+                );
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
+
+
 
     @Override
     public List<WalletResponse> fetchWallet() {
@@ -108,5 +139,50 @@ public class WalletServiceImpl implements WalletService {
             return "Wallet deleted successfully";
         }
         return "Wallet not found";
+    }
+
+
+
+    @Override
+    @Transactional
+    public void processWalletTransaction(TransactionEvent event) {
+        WalletEntity senderWallet = walletRepository.findByUserId(event.getSenderUserId())
+                .orElseThrow(() -> new RuntimeException("Sender wallet not found"));
+        BigDecimal totalDeductAmount = event.getAmount().add(event.getCharge());
+
+        if (senderWallet.getBalance().compareTo(totalDeductAmount) < 0) {
+            log.warn("Insufficient balance for User: {}. Required: {}, Available: {}",
+                    event.getSenderUserId(), totalDeductAmount, senderWallet.getBalance());
+
+            sendRollbackMessage(event, FailureReasonType.INSUFFICIENT_BALANCE);
+            return;
+        }
+
+        senderWallet.setBalance(senderWallet.getBalance().subtract(totalDeductAmount));
+        walletRepository.save(senderWallet);
+
+
+        WalletEntity receiverWallet = walletRepository.findByUserId(event.getReceiverUserId())
+                .orElseThrow(() -> new RuntimeException("Receiver wallet not found"));
+
+
+        BigDecimal totalCreditAmount = event.getAmount().add(event.getCommission());
+        receiverWallet.setBalance(receiverWallet.getBalance().add(totalCreditAmount));
+        walletRepository.save(receiverWallet);
+
+        log.info("Wallet balances updated successfully for TxId: {}", event.getTxId());
+
+        event.setTxStatus(TransactionStatus.SUCCESS);
+        rabbitTemplate.convertAndSend(exchange, rollbackRoutingKey, event);
+
+    }
+
+
+    @Override
+    public void sendRollbackMessage(TransactionEvent event, FailureReasonType reason) {
+        log.info("Sending rollback/failure message to Transaction Service for TxId: {}", event.getTxId());
+        event.setTxStatus(TransactionStatus.FAILED);
+        event.setFailureReason(reason);
+        rabbitTemplate.convertAndSend(exchange, rollbackRoutingKey, event);
     }
 }
