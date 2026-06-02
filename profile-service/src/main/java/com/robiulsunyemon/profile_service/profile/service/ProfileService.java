@@ -9,8 +9,8 @@ import java.util.Optional;
 public interface ProfileService {
     void createProfile(WalletCreatedMessage request);
     List<ProfileResponse> fetchProfile();
-    Optional<ProfileResponse> findByProfileId(Long id);
-    Optional<ProfileResponse> findProfileByUserId(Long id);
+    ProfileResponse findByProfileId(Long id);
+    ProfileResponse findProfileByUserId(Long id);
     String deleteProfileById(Long id);
     void updateProfileWithNid(Long userId, MultipartFile frontImage, MultipartFile backImage);
     void kycVerificationWithNid(Long userId, MultipartFile selfie);

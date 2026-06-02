@@ -2,12 +2,14 @@ package com.robiulsunyemon.wallet_service.wallet.service.impl;
 import com.robiulsunyemon.wallet_service.wallet.config.RabbitMQConfig;
 import com.robiulsunyemon.wallet_service.wallet.dto.*;
 import com.robiulsunyemon.wallet_service.wallet.entity.WalletEntity;
+import com.robiulsunyemon.wallet_service.wallet.exceptions.ResourceNotFoundException;
 import com.robiulsunyemon.wallet_service.wallet.mapper.WalletMapper;
 import com.robiulsunyemon.wallet_service.wallet.repository.WalletRepository;
 import com.robiulsunyemon.wallet_service.wallet.service.WalletService;
 import lombok.AllArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
@@ -91,6 +93,12 @@ public class WalletServiceImpl implements WalletService {
     public Optional<WalletResponse> findByWalletId(Long id) {
         return walletRepository.findById(id)
                 .map(walletMapper::entityToResponse);
+    }
+
+    @Override
+    public WalletResponse findWalletByUserId(Long userId) {
+        WalletEntity entity=walletRepository.findByUserId(userId).orElseThrow(()->new ResourceNotFoundException("User does not found", HttpStatus.NOT_FOUND));
+        return walletMapper.entityToResponse(entity);
     }
 
     @Override

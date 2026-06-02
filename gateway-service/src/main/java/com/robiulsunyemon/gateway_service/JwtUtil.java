@@ -21,7 +21,6 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
-        // ✅ secretKey (@Value থেকে আসে) সরাসরি decode করো
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }

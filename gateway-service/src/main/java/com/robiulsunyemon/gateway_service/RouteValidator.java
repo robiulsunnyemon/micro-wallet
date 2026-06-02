@@ -24,15 +24,14 @@ public class RouteValidator {
         String path = request.getURI().getPath();
         HttpMethod method = request.getMethod();
 
-
         boolean isOpenEndpoint = openApiEndpoints.stream().anyMatch(path::contains);
         if (isOpenEndpoint) {
             return false;
         }
 
-
         if (method == HttpMethod.GET) {
-            boolean isPublicGet = publicGetEndpoints.stream().anyMatch(path::contains);
+            // exact match ব্যবহার করা হয়েছে, যাতে /wallets/me কে public না ভাবা হয়
+            boolean isPublicGet = publicGetEndpoints.stream().anyMatch(p -> path.equals(p) || path.equals(p + "/"));
             return !isPublicGet;
         }
 

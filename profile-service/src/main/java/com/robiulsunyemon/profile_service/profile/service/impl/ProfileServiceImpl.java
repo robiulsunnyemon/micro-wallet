@@ -4,6 +4,7 @@ import com.robiulsunyemon.profile_service.profile.config.RabbitMQConfig;
 import com.robiulsunyemon.profile_service.profile.dto.*;
 import com.robiulsunyemon.profile_service.profile.entity.KycStatus;
 import com.robiulsunyemon.profile_service.profile.entity.ProfileEntity;
+import com.robiulsunyemon.profile_service.profile.exceptions.ResourceNotFoundException;
 import com.robiulsunyemon.profile_service.profile.mapper.ProfileMapper;
 import com.robiulsunyemon.profile_service.profile.repository.ProfileRepository;
 import com.robiulsunyemon.profile_service.profile.service.NidService;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -79,18 +81,14 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public Optional<ProfileResponse> findByProfileId(Long id) {
-        return profileRepository.findById(id)
-                .map(profileMapper::entityToResponse);
+    public ProfileResponse findByProfileId(Long id) {
+        return profileRepository.findById(id).map(profileMapper::entityToResponse).orElseThrow(()->new ResourceNotFoundException("User is not found by profile id: "+id, HttpStatus.NOT_FOUND));
     }
 
     @Override
-    public Optional<ProfileResponse> findProfileByUserId(Long id) {
+    public ProfileResponse findProfileByUserId(Long id) {
         return profileRepository.findByUserId(id)
-                .map(entity -> {
-                    ProfileResponse response = new ProfileResponse();
-                   return profileMapper.entityToResponse(entity);
-                });
+                .map(profileMapper::entityToResponse).orElseThrow(()->new ResourceNotFoundException("User is not found by profile id: "+id, HttpStatus.NOT_FOUND));
     }
 
     @Override
@@ -154,6 +152,11 @@ public class ProfileServiceImpl implements ProfileService {
 
     {
         try {
+
+            if(selfie==null){
+                System.out.println("kyc verification is failed. selfie is not found");
+            }
+
             byte[] selfieBytes = selfie.getBytes();
             Map<?, ?> selfieImage = cloudinary.uploader().upload(selfieBytes, com.cloudinary.utils.ObjectUtils.emptyMap());
             String selfieUrl = (String) selfieImage.get("secure_url");

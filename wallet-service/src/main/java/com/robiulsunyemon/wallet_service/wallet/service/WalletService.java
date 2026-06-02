@@ -11,5 +11,6 @@ public interface WalletService {
     void handleProfileRegistrationStatusUpdate(RegistrationStatusMessage statusMessage);
     List<WalletResponse> fetchWallet();
     Optional<WalletResponse> findByWalletId(Long id);
+    WalletResponse findWalletByUserId(Long userId);
     String deleteWalletById(Long id);
 }
