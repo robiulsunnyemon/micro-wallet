@@ -202,4 +202,13 @@ public class AuthServiceImpl implements AuthService {
 
         return "Your password has been successfully reset. Please log in with your new password.";
     }
+
+    @Override
+    public AuthResponse findById(Long id) {
+        return authRepository.findById(id).map(authMapper::entityToResponse).orElseThrow(
+                ()->new ResourceNotFoundException(
+                        "User not found by userId: "+id,HttpStatus.NOT_FOUND
+                )
+        );
+    }
 }

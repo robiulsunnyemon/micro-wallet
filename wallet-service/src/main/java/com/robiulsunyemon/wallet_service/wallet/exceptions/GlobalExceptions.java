@@ -51,10 +51,10 @@ public class GlobalExceptions {
         GlobalResponse<Object> response = GlobalResponse.<Object>builder()
                 .statusCode(status.value())
                 .success(false)
-                .message(message)  // Main error message at top level
+                .message(message)
                 .path(request.getRequestURI())
-                .data(null)        // No success data on error
-                .errors(errors)    // Detailed error information
+                .data(null)
+                .errors(errors)
                 .timestamp(LocalDateTime.now())
                 .build();
 

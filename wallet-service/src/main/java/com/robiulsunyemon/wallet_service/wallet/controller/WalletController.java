@@ -33,6 +33,7 @@ public class WalletController {
         );
     }
 
+
     @GetMapping("/me")
     public ResponseEntity<GlobalResponse<WalletResponse>> fetchWalletByUserId(
             @RequestHeader(value = "userId", required = false) Long userId,

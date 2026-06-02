@@ -40,6 +40,10 @@ public class GlobalExceptions {
     public ResponseEntity<GlobalResponse<Object>> handleGenericException(Exception ex, HttpServletRequest request) {
         return buildErrorResponse("An unexpected error occurred. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<GlobalResponse<Object>> handleIllegalArgumentException(IllegalArgumentException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
+    }
 
     // Common error response builder method using the updated GlobalResponse
     private ResponseEntity<GlobalResponse<Object>> buildErrorResponse(String message, HttpStatus status, HttpServletRequest request) {

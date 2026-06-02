@@ -11,4 +11,5 @@ public interface AuthService {
     String forgotPassword(EmailRequest email);
     ForgetPasswordOtpVerifyResponse verifyForgotPasswordOtp(OtpVerifyRequest request);
     String resetPassword(ResetPasswordRequest request);
+    AuthResponse findById(Long id);
 }
