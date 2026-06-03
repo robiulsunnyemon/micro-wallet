@@ -3,10 +3,13 @@ import com.robiulsunyemon.transaction_service.transaction.clients.WalletClient;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionRequest;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionResponse;
 import com.robiulsunyemon.transaction_service.transaction.entity.*;
+import com.robiulsunyemon.transaction_service.transaction.exceptons.BadRequestException;
 import com.robiulsunyemon.transaction_service.transaction.exceptons.ResourceNotFoundException;
 import com.robiulsunyemon.transaction_service.transaction.mapper.TransactionMapper;
 import com.robiulsunyemon.transaction_service.transaction.repository.TransactionRepository;
+import com.robiulsunyemon.transaction_service.transaction.service.AuditPublisherService;
 import com.robiulsunyemon.transaction_service.transaction.service.TransactionService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -29,6 +33,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final RabbitTemplate rabbitTemplate;
     private final TransactionMapper transactionMapper;
     private final WalletClient walletClient;
+    private final AuditPublisherService auditPublisherService;
 
 
     @Value("${rabbitmq.exchange}")
@@ -39,66 +44,93 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
-    public void createTransaction(Long userId, String roleStr, TransactionRequest request) {
+    public void createTransaction(Long userId, String roleStr, TransactionRequest request, HttpServletRequest httpServletRequest) {
         log.info("Initiating transaction for user id: {} with type: {}", userId, request.getTxType());
-
-
-        Role senderRole = null;
-        if (roleStr != null && !roleStr.isBlank()) {
-            String cleanRole = roleStr.replace("ROLE_", "").toUpperCase().trim();
-            senderRole = Role.valueOf(cleanRole);
-        }
-
-        Role receiverRole = null;
+        String ipAddress = httpServletRequest != null ? httpServletRequest.getRemoteAddr() : "UNKNOWN";
+        String deviceInfo = httpServletRequest != null ? httpServletRequest.getHeader("User-Agent") : "UNKNOWN";
         try {
-            String fetchedRole = walletClient.getReceiverRole(request.getReceiverUserId());
-            if (fetchedRole != null) {
-                receiverRole = Role.valueOf(fetchedRole.replace("ROLE_", "").toUpperCase().trim());
+            Role senderRole = null;
+            if (roleStr != null && !roleStr.isBlank()) {
+                String cleanRole = roleStr.replace("ROLE_", "").toUpperCase().trim();
+                senderRole = Role.valueOf(cleanRole);
+            }
+
+            Role receiverRole = null;
+            try {
+                String fetchedRole = walletClient.getReceiverRole(request.getReceiverUserId());
+                if (fetchedRole != null) {
+                    receiverRole = Role.valueOf(fetchedRole.replace("ROLE_", "").toUpperCase().trim());
+                }
+            } catch (Exception e) {
+                log.error("Failed to fetch receiver role from wallet-service for userId: {}", request.getReceiverUserId(), e);
+                throw new ResourceNotFoundException("Wallet verification service is currently unavailable.",HttpStatus.FAILED_DEPENDENCY);
+            }
+
+            validateTransactionRules(request.getTxType(), senderRole, receiverRole);
+
+
+            TransactionEntity transactionEntity = new TransactionEntity();
+            transactionEntity.setUserId(userId);
+
+            BigDecimal amount = request.getAmount();
+            TransactionType txType = request.getTxType();
+            BigDecimal limitAmount = new BigDecimal("25000.00");
+            boolean isAboveLimit = amount.compareTo(limitAmount) > 0;
+
+
+            BigDecimal charge = calculateCharge(txType, isAboveLimit);
+            transactionEntity.setCharge(charge);
+
+            BigDecimal commission = calculateCommissionFromCharge(txType, charge, receiverRole);
+            transactionEntity.setCommission(commission);
+
+            transactionEntity.setParentTxId(request.getParentTxId());
+            transactionEntity.setTxId(generateUniqueTxId());
+            transactionEntity.setSenderUserId(userId);
+            transactionEntity.setReceiverUserId(request.getReceiverUserId());
+            transactionEntity.setAmount(amount);
+            transactionEntity.setTxType(txType);
+            transactionEntity.setCurrency(CurrencyType.BDT);
+            transactionEntity.setTxStatus(TransactionStatus.PENDING);
+            transactionEntity.setReference(request.getReference());
+
+
+            TransactionEntity savedTransaction = transactionRepository.save(transactionEntity);
+            log.info("Transaction saved in database with ID: {} and Status: PENDING", savedTransaction.getTxId());
+           // Audit: Transaction Initiation Success (PENDING State)
+            Map<String, Object> auditDetails = Map.of(
+                    "sender_id", savedTransaction.getSenderUserId(),
+                    "receiver_id", savedTransaction.getReceiverUserId(),
+                    "amount", savedTransaction.getAmount(),
+                    "charge", savedTransaction.getCharge(),
+                    "commission", savedTransaction.getCommission(),
+                    "tx_type", savedTransaction.getTxType().name(),
+                    "status", "PENDING"
+            );
+            auditPublisherService.publishAudit(
+                    "TRANSACTION_INITIATE", String.valueOf(userId), savedTransaction.getTxId(),
+                    null, auditDetails, "SUCCESS", ipAddress, deviceInfo, null
+            );
+
+            try {
+                rabbitTemplate.convertAndSend(exchange, routingKey, savedTransaction);
+                log.info("Successfully published transaction message to RabbitMQ exchange: {}", exchange);
+            } catch (Exception e) {
+                log.error("Failed to send transaction message to RabbitMQ for TxId: {}", savedTransaction.getTxId(), e);
+                throw new BadRequestException("Message queue dispatch failed. Transaction rolled back.", HttpStatus.BAD_REQUEST);
             }
         } catch (Exception e) {
-            log.error("Failed to fetch receiver role from wallet-service for userId: {}", request.getReceiverUserId(), e);
-            throw new ResourceNotFoundException("Wallet verification service is currently unavailable.",HttpStatus.FAILED_DEPENDENCY);
-        }
-
-        validateTransactionRules(request.getTxType(), senderRole, receiverRole);
-
-
-        TransactionEntity transactionEntity = new TransactionEntity();
-        transactionEntity.setUserId(userId);
-
-        BigDecimal amount = request.getAmount();
-        TransactionType txType = request.getTxType();
-        BigDecimal limitAmount = new BigDecimal("25000.00");
-        boolean isAboveLimit = amount.compareTo(limitAmount) > 0;
-
-
-        BigDecimal charge = calculateCharge(txType, isAboveLimit);
-        transactionEntity.setCharge(charge);
-
-        BigDecimal commission = calculateCommissionFromCharge(txType, charge, receiverRole);
-        transactionEntity.setCommission(commission);
-
-        transactionEntity.setParentTxId(request.getParentTxId());
-        transactionEntity.setTxId(generateUniqueTxId());
-        transactionEntity.setSenderUserId(userId);
-        transactionEntity.setReceiverUserId(request.getReceiverUserId());
-        transactionEntity.setAmount(amount);
-        transactionEntity.setTxType(txType);
-        transactionEntity.setCurrency(CurrencyType.BDT);
-        transactionEntity.setTxStatus(TransactionStatus.PENDING);
-        transactionEntity.setReference(request.getReference());
-
-
-        TransactionEntity savedTransaction = transactionRepository.save(transactionEntity);
-        log.info("Transaction saved in database with ID: {} and Status: PENDING", savedTransaction.getTxId());
-
-
-        try {
-            rabbitTemplate.convertAndSend(exchange, routingKey, savedTransaction);
-            log.info("Successfully published transaction message to RabbitMQ exchange: {}", exchange);
-        } catch (Exception e) {
-            log.error("Failed to send transaction message to RabbitMQ for TxId: {}", savedTransaction.getTxId(), e);
-            throw new RuntimeException("Message queue dispatch failed. Transaction rolled back.", e);
+            // Audit: Transaction Initiation Failed
+            Map<String, Object> failedDetails = Map.of(
+                    "receiver_id", request.getReceiverUserId(),
+                    "amount", request.getAmount(),
+                    "tx_type", request.getTxType().name()
+            );
+            auditPublisherService.publishAudit(
+                    "TRANSACTION_INITIATE", String.valueOf(userId), null,
+                    null, failedDetails, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
+            throw e;
         }
     }
 
@@ -171,11 +203,17 @@ public class TransactionServiceImpl implements TransactionService {
         TransactionEntity transaction = transactionRepository.findByTxId(event.getTxId())
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction not found for TxId: " + event.getTxId(), HttpStatus.NOT_FOUND));
 
+        Map<String, Object> oldStatusMap = Map.of("tx_status", transaction.getTxStatus().name());
+
         try {
 
             TransactionStatus finalStatus = TransactionStatus.valueOf(event.getTxStatus().name());
             transaction.setTxStatus(finalStatus);
 
+            Map<String, Object> newStatusMap = Map.of(
+                    "tx_status", finalStatus.name(),
+                    "amount", transaction.getAmount()
+            );
 
             if (finalStatus == TransactionStatus.FAILED && event.getFailureReason() != null) {
                 log.warn("Transaction {} failed due to: {}", event.getTxId(), event.getFailureReason());
@@ -186,13 +224,33 @@ public class TransactionServiceImpl implements TransactionService {
                     log.error("Unknown failure reason received: {}. Falling back to SYSTEM_ERROR", event.getFailureReason());
                     transaction.setFailureReason(FailureReasonType.SYSTEM_ERROR);
                 }
+
+                newStatusMap = Map.of(
+                        "tx_status", finalStatus.name(),
+                        "amount", transaction.getAmount(),
+                        "failure_reason", transaction.getFailureReason().name()
+                );
             }
 
             transactionRepository.save(transaction);
             log.info("Transaction TxId: {} has been finalized to status: {}", event.getTxId(), finalStatus);
 
+            // Audit: Transaction Final Status (SUCCESS/FAILED)
+            auditPublisherService.publishAudit(
+                    "TRANSACTION_FINALIZE", "SYSTEM", transaction.getTxId(),
+                    oldStatusMap, newStatusMap, finalStatus.name(), "QUEUE_EVENT", "Wallet_Service_Callback", null
+            );
+
         } catch (IllegalArgumentException e) {
             log.error("Invalid status value received from wallet service: {}", event.getTxStatus());
+
+            log.error("Failed to update transaction status for TxId: {}", event.getTxId(), e);
+
+            auditPublisherService.publishAudit(
+                    "TRANSACTION_FINALIZE", "SYSTEM", event.getTxId(),
+                    oldStatusMap, null, "FAILED", "QUEUE_EVENT", "Wallet_Service_Callback", e.getMessage()
+            );
+            throw e;
         }
     }
 

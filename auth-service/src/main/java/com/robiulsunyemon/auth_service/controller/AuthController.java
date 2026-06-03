@@ -19,7 +19,7 @@ public class AuthController {
             @RequestBody AuthRequest authRequest,
             HttpServletRequest req) {
 
-        AuthResponse authResponse = authService.createUser(authRequest);
+        AuthResponse authResponse = authService.createUser(authRequest,req);
         return buildSuccessResponse(
                 authResponse,
                 HttpStatus.CREATED,
@@ -33,7 +33,7 @@ public class AuthController {
             @RequestBody LoginRequest loginRequest,
             HttpServletRequest req) {
 
-        LoginResponse loginResponse = authService.login(loginRequest);
+        LoginResponse loginResponse = authService.login(loginRequest,req);
         return buildSuccessResponse(
                 loginResponse,
                 HttpStatus.OK,
@@ -47,7 +47,7 @@ public class AuthController {
             @RequestBody OtpVerifyRequest otpVerifyRequest,
             HttpServletRequest req) {
 
-        String result = authService.verifyOtp(otpVerifyRequest);
+        String result = authService.verifyOtp(otpVerifyRequest,req);
         return buildSuccessResponse(
                 result,
                 HttpStatus.OK,
@@ -61,7 +61,7 @@ public class AuthController {
             @RequestBody EmailRequest emailRequest,
             HttpServletRequest req) {
 
-        String result = authService.resendOtp(emailRequest);
+        String result = authService.resendOtp(emailRequest,req);
         return buildSuccessResponse(
                 result,
                 HttpStatus.OK,
@@ -75,7 +75,7 @@ public class AuthController {
             @RequestBody EmailRequest emailRequest,
             HttpServletRequest req) {
 
-        String result = authService.forgotPassword(emailRequest);
+        String result = authService.forgotPassword(emailRequest,req);
         return buildSuccessResponse(
                 result,
                 HttpStatus.OK,
@@ -89,7 +89,7 @@ public class AuthController {
             @RequestBody OtpVerifyRequest otpVerifyRequest,
             HttpServletRequest req) {
 
-        ForgetPasswordOtpVerifyResponse result = authService.verifyForgotPasswordOtp(otpVerifyRequest);
+        ForgetPasswordOtpVerifyResponse result = authService.verifyForgotPasswordOtp(otpVerifyRequest,req);
         return buildSuccessResponse(
                 result,
                 HttpStatus.OK,
@@ -103,7 +103,7 @@ public class AuthController {
             @RequestBody ResetPasswordRequest resetPasswordRequest,
             HttpServletRequest req) {
 
-        String result = authService.resetPassword(resetPasswordRequest);
+        String result = authService.resetPassword(resetPasswordRequest,req);
         return buildSuccessResponse(
                 result,
                 HttpStatus.OK,

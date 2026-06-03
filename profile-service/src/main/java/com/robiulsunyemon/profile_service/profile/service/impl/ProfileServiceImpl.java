@@ -7,6 +7,7 @@ import com.robiulsunyemon.profile_service.profile.entity.ProfileEntity;
 import com.robiulsunyemon.profile_service.profile.exceptions.ResourceNotFoundException;
 import com.robiulsunyemon.profile_service.profile.mapper.ProfileMapper;
 import com.robiulsunyemon.profile_service.profile.repository.ProfileRepository;
+import com.robiulsunyemon.profile_service.profile.service.AuditPublisherService;
 import com.robiulsunyemon.profile_service.profile.service.NidService;
 import com.robiulsunyemon.profile_service.profile.service.ProfileService;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final RabbitMQConfig rabbitMQConfig;
     private final NidService nidService;
     private final Cloudinary cloudinary;
-
+    private final AuditPublisherService auditPublisherService;
 
     @RabbitListener(queues = "${rabbitmq.queue}")
     @Override
@@ -61,10 +62,30 @@ public class ProfileServiceImpl implements ProfileService {
             profileEntity.setKycStatus(KycStatus.PENDING);
             ProfileEntity savedEntity = profileRepository.save(profileEntity);
             System.out.println("Successfully received Message from rabbitMq and create profile");
+
+            // Audit: Profile Creation Success
+            Map<String, Object> auditNewValue = Map.of(
+                    "userId", savedEntity.getUserId(),
+                    "walletId", savedEntity.getWalletId(),
+                    "kycStatus", savedEntity.getKycStatus().name()
+            );
+            auditPublisherService.publishAudit(
+                    "PROFILE_CREATION", "SYSTEM", String.valueOf(savedEntity.getId()),
+                    null, auditNewValue, "SUCCESS", "QUEUE_EVENT", "RabbitMQ_Listener", null
+            );
+
+
             RegistrationStatusMessage statusMessage=new RegistrationStatusMessage(true,request.getUserId());
             rabbitTemplate.convertAndSend(rabbitMQConfig.getExchangeName(),rabbitMQConfig.getRollBackRouting(),statusMessage);
 
         } catch (Exception e) {
+
+            // Audit: Profile Creation Failed
+            auditPublisherService.publishAudit(
+                    "PROFILE_CREATION", "SYSTEM", String.valueOf(request.getUserId()),
+                    null, Map.of("userId", request.getUserId()), "FAILED", "QUEUE_EVENT", "RabbitMQ_Listener", e.getMessage()
+            );
+
             RegistrationStatusMessage statusMessage=new RegistrationStatusMessage(false,request.getUserId());
             rabbitTemplate.convertAndSend(rabbitMQConfig.getExchangeName(),rabbitMQConfig.getRollBackRouting(),statusMessage);
             System.out.println("Error occur from profile service. No message received from wallet service. because: "+e);
@@ -120,6 +141,7 @@ public class ProfileServiceImpl implements ProfileService {
 
                     Optional<ProfileEntity> profileEntityOpt = profileRepository.findByUserId(userId);
                     profileEntityOpt.ifPresent(entity -> {
+                        Map<String, Object> oldKycState = Map.of("kycStatus", entity.getKycStatus().name());
                         entity.setNidNumber(nidResponseDto.getNidNumber());
                         entity.setNameEn(nidResponseDto.getNameEn());
                         entity.setNameBn(nidResponseDto.getNameBn());
@@ -128,10 +150,25 @@ public class ProfileServiceImpl implements ProfileService {
                         entity.setNidFrontSide(frontUrl);
                         entity.setNidBackSide(backUrl);
                         entity.setKycStatus(KycStatus.NOT_VARIFIED);
-                        profileRepository.save(entity);
+                        ProfileEntity updatedEntity = profileRepository.save(entity);
+                        // Audit: NID Upload and Profile Data Parse Success
+                        Map<String, Object> newKycState = Map.of(
+                                "nidNumber", updatedEntity.getNidNumber(),
+                                "nameEn", updatedEntity.getNameEn(),
+                                "kycStatus", updatedEntity.getKycStatus().name()
+                        );
+                        auditPublisherService.publishAudit(
+                                "NID_DATA_UPDATE", String.valueOf(userId), String.valueOf(updatedEntity.getId()),
+                                oldKycState, newKycState, "SUCCESS", "ASYNC_TASK", "Nid_OCR_Service", null
+                        );
 
                     });
                 } catch (Exception e) {
+                    // Audit: Background NID Data Parse Failed
+                    auditPublisherService.publishAudit(
+                            "NID_DATA_UPDATE", String.valueOf(userId), null,
+                            null, null, "FAILED", "ASYNC_TASK", "Nid_OCR_Service", e.getMessage()
+                    );
                     System.err.println("Background NID processing failed: " + e.getMessage());
                 }
             });
@@ -177,8 +214,22 @@ public class ProfileServiceImpl implements ProfileService {
                         );
 
                         log.info("Message sent successfully");
+                        // Audit: KYC Dispatch Success
+                        Map<String, Object> auditNewValue = Map.of(
+                                "selfieUrl", selfieUrl,
+                                "nidFrontUrl", entity.getNidFrontSide()
+                        );
+                        auditPublisherService.publishAudit(
+                                "KYC_VERIFICATION_DISPATCH", String.valueOf(userId), String.valueOf(entity.getId()),
+                                null, auditNewValue, "SUCCESS", "ASYNC_TASK", "KYC_Dispatch_Handler", null
+                        );
                     });
                 } catch (Exception e) {
+                    // Audit: KYC Dispatch Failed
+                    auditPublisherService.publishAudit(
+                            "KYC_VERIFICATION_DISPATCH", String.valueOf(userId), null,
+                            null, null, "FAILED", "ASYNC_TASK", "KYC_Dispatch_Handler", e.getMessage()
+                    );
                     System.err.println("Background NID processing failed: " + e.getMessage());
                 }
             });

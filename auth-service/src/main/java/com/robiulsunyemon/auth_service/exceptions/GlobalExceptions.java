@@ -23,6 +23,13 @@ public class GlobalExceptions {
         return buildErrorResponse(ex.getMessage(), ex.getStatus(), request);
     }
 
+    // DuplicateFoundException (404 Not Found)
+    @ExceptionHandler(DuplicateException.class)
+    public ResponseEntity<GlobalResponse<Object>> handleDuplicateException(DuplicateException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), ex.getStatus(), request);
+    }
+
+
     // BadRequestException (400 Bad Request)
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<GlobalResponse<Object>> handleBadRequestException(BadRequestException ex, HttpServletRequest request) {

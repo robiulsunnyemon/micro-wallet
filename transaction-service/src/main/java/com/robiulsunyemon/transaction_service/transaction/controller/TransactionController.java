@@ -44,7 +44,7 @@ public class TransactionController {
                 return buildSuccessResponse(null, HttpStatus.UNAUTHORIZED,
                         "Missing userId header", request.getRequestURI());
             }
-        transactionService.createTransaction(userId, role, transactionRequest);
+        transactionService.createTransaction(userId, role, transactionRequest,request);
 
         return buildSuccessResponse(
                 "Processing your payment securely. Please do not close the app or refresh the page.",

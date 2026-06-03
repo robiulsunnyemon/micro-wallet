@@ -31,6 +31,40 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.routing-key-wallet}")
     private String routingKeyWallet;
 
+
+    @Value("${rabbitmq.audit-exchange}")
+    private String auditExchange;
+
+    @Value("${rabbitmq.audit-queue}")
+    private String auditQueue;
+
+    @Value("${rabbitmq.audit-routing-key}")
+    private String auditRoutingKey;
+
+
+    @Bean
+    public TopicExchange auditExchange() {
+        return new TopicExchange(auditExchange);
+    }
+
+
+    @Bean
+    public Queue auditQueue() {
+        return new Queue(auditQueue, true);
+    }
+
+
+    @Bean
+    public Binding auditBinding() {
+        return BindingBuilder
+                .bind(auditQueue())
+                .to(auditExchange())
+                .with(auditRoutingKey);
+    }
+
+
+
+
     @Bean
     public DirectExchange exchange(){
         return new DirectExchange(exchangeName);

@@ -3,13 +3,16 @@ import com.robiulsunyemon.auth_service.config.RabbitMQConfig;
 import com.robiulsunyemon.auth_service.dto.*;
 import com.robiulsunyemon.auth_service.entity.AccountStatus;
 import com.robiulsunyemon.auth_service.entity.UserEntity;
+import com.robiulsunyemon.auth_service.exceptions.DuplicateException;
 import com.robiulsunyemon.auth_service.exceptions.ResourceNotFoundException;
 import com.robiulsunyemon.auth_service.exceptions.BadRequestException;
 import com.robiulsunyemon.auth_service.mapper.AuthMapper;
 import com.robiulsunyemon.auth_service.repository.AuthRepository;
+import com.robiulsunyemon.auth_service.service.AuditPublisherService;
 import com.robiulsunyemon.auth_service.service.AuthService;
 import com.robiulsunyemon.auth_service.service.OtpService;
 import com.robiulsunyemon.auth_service.utils.JwtService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -22,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -36,49 +40,116 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final RabbitMQConfig rabbitMQConfig;
     private final RabbitTemplate rabbitTemplate;
+    private final AuditPublisherService auditPublisherService;
 
     @Override
     @Transactional
-    public AuthResponse createUser(AuthRequest request) {
-        UserEntity user = authMapper.requestToUserEntity(request);
-        AuthResponse response = authMapper.entityToResponse(authRepository.save(user));
-        otpService.sendAndSaveOtp(request.getEmail());
-        return response;
-    }
+    public AuthResponse createUser(AuthRequest request, HttpServletRequest httpServletRequest) {
 
-    @Override
-    public LoginResponse login(LoginRequest request) {
-        UserEntity user = authRepository.findByPhoneNumber(request.getPhoneNumber())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        String.format("User not found with phone number: %s", request.getPhoneNumber()),
-                        HttpStatus.NOT_FOUND
-                ));
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
 
-
-        if (!user.getIsVerified()) {
-            throw new DisabledException("Your account is not verified. Please verify your OTP first.");
-        }
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new DisabledException("Your account is currently inactive or suspended.");
-        }
-
+        Map<String, Object> auditNewValue = Map.of(
+                "username", request.getPhoneNumber(),
+                "email", request.getEmail(),
+                "role", request.getRole() != null ? request.getRole().name() : "USER"
+        );
 
         try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getPhoneNumber(), request.getPassword())
+
+            if(authRepository.existsByEmail(request.getEmail())){
+                auditPublisherService.publishAudit(
+                        "USER_SIGNUP", null, null,
+                        null, auditNewValue, "FAILED", ipAddress, deviceInfo, "Email already exists"
+                );
+                throw new DuplicateException("Email already exists",HttpStatus.BAD_REQUEST);
+            }
+            if(authRepository.existsByPhoneNumber(request.getPhoneNumber())){
+                auditPublisherService.publishAudit(
+                        "USER_SIGNUP", null, null,
+                        null, auditNewValue, "FAILED", ipAddress, deviceInfo, "Phone Number already exists"
+                );
+                throw new DuplicateException("Phone Number already exists",HttpStatus.BAD_REQUEST);
+            }
+
+
+            UserEntity user = authMapper.requestToUserEntity(request);
+            UserEntity entity=authRepository.save(user);
+            AuthResponse response = authMapper.entityToResponse(entity);
+           // Audit: Successful signup
+            auditPublisherService.publishAudit(
+                    "USER_SIGNUP", String.valueOf(entity.getId()), String.valueOf(entity.getId()),
+                    null, auditNewValue, "SUCCESS", ipAddress, deviceInfo, null
             );
-        } catch (BadCredentialsException e) {
-            throw new BadCredentialsException("Invalid phone number or password.");
+
+            otpService.sendAndSaveOtp(request.getEmail());
+            return response;
+        } catch (Exception e) {
+            // Audit: failed signup
+            auditPublisherService.publishAudit(
+                    "USER_SIGNUP", null, null,
+                    null, auditNewValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
+            throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public LoginResponse login(LoginRequest request, HttpServletRequest httpServletRequest) {
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
+        Map<String, Object> auditValue = Map.of("phone_number", request.getPhoneNumber());
+
+        try {
+            UserEntity user = authRepository.findByPhoneNumber(request.getPhoneNumber())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            String.format("User not found with phone number: %s", request.getPhoneNumber()),
+                            HttpStatus.NOT_FOUND
+                    ));
 
 
-        String token = jwtService.generateToken(user.getPhoneNumber(), user.getRole(),user.getId());
-        return new LoginResponse("Bearer", token);
+            if (!user.getIsVerified()) {
+                throw new DisabledException("Your account is not verified. Please verify your OTP first.");
+            }
+            if (user.getAccountStatus() != AccountStatus.ACTIVE) {
+                throw new DisabledException("Your account is currently inactive or suspended.");
+            }
+
+
+            try {
+                authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(request.getPhoneNumber(), request.getPassword())
+                );
+            } catch (BadCredentialsException e) {
+                throw new BadCredentialsException("Invalid phone number or password.");
+            }
+
+
+            String token = jwtService.generateToken(user.getPhoneNumber(), user.getRole(),user.getId());
+            // Audit: Successful Login
+            auditPublisherService.publishAudit(
+                    "USER_LOGIN", String.valueOf(user.getId()), String.valueOf(user.getId()),
+                    null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
+            );
+
+            return new LoginResponse("Bearer", token);
+        } catch (RuntimeException e) {
+            // Audit: Failed Login
+            auditPublisherService.publishAudit(
+                    "USER_LOGIN", null, null,
+                    null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     @Transactional
-    public String verifyOtp(OtpVerifyRequest request) {
+    public String verifyOtp(OtpVerifyRequest request, HttpServletRequest httpServletRequest) {
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
+        Map<String, Object> auditValue = Map.of("email", request.getEmail());
+
         try {
             boolean isVerified = otpService.verifyOtp(request.getEmail(), request.getOtp());
             if (!isVerified) {
@@ -97,18 +168,27 @@ public class AuthServiceImpl implements AuthService {
                     rabbitMQConfig.getRoutingKeyWallet(),
                     walletMessage
             );
+            // Audit: Success OTP Verification
+            auditPublisherService.publishAudit(
+                    "OTP_VERIFY", String.valueOf(user.getId()), String.valueOf(user.getId()),
+                    null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
+            );
+            return "OTP verified successfully. Your account is now active.";
 
         } catch (Exception e) {
             System.out.println("Error occur from auth service. No message delivery from auth service. because: "+e);
+            // Audit: Failed OTP Verification
+            auditPublisherService.publishAudit(
+                    "OTP_VERIFY", null, null,
+                    null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
             throw new RuntimeException(e);
         }
-        return "OTP verified successfully. Your account is now active.";
     }
 
     @RabbitListener(queues = "${rabbitmq.rollback-queue}")
     @Override
     public void handleRegistrationStatusUpdate(RegistrationStatusMessage statusMessage) {
-
         System.out.println("successfully come registration status update message");
 
         try {
@@ -129,78 +209,156 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public String resendOtp(EmailRequest request) {
-        UserEntity user = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        String.format("Account not found with email: %s", request.getEmail()),
-                        HttpStatus.NOT_FOUND
-                ));
+    public String resendOtp(EmailRequest request, HttpServletRequest httpServletRequest) {
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
+        Map<String, Object> auditValue = Map.of("email", request.getEmail());
 
-        otpService.sendAndSaveOtp(request.getEmail());
-        return String.format("OTP has been successfully resent to your email: %s", request.getEmail());
+        try {
+            UserEntity user = authRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            String.format("Account not found with email: %s", request.getEmail()),
+                            HttpStatus.NOT_FOUND
+                    ));
+
+            otpService.sendAndSaveOtp(request.getEmail());
+            // Audit: Resend OTP Success
+            auditPublisherService.publishAudit(
+                    "RESEND_OTP", String.valueOf(user.getId()), String.valueOf(user.getId()),
+                    null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
+            );
+            return String.format("OTP has been successfully resent to your email: %s", request.getEmail());
+        } catch (Exception e) {
+            // Audit: Resend OTP Failed
+            auditPublisherService.publishAudit(
+                    "RESEND_OTP", null, null,
+                    null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
+            throw e;
+        }
     }
 
     @Override
-    public String forgotPassword(EmailRequest request) {
-        UserEntity user = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        String.format("Account not found with email: %s", request.getEmail()),
-                        HttpStatus.NOT_FOUND
-                ));
+    public String forgotPassword(EmailRequest request, HttpServletRequest httpServletRequest) {
+
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
+        Map<String, Object> auditValue = Map.of("email", request.getEmail());
+
+        try {
+            UserEntity user = authRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            String.format("Account not found with email: %s", request.getEmail()),
+                            HttpStatus.NOT_FOUND
+                    ));
 
 
-        if (user.getAccountStatus() != AccountStatus.ACTIVE || !user.getIsVerified()) {
-            throw new BadRequestException("Cannot reset password. Your account must be active and verified.", HttpStatus.BAD_REQUEST);
+            if (user.getAccountStatus() != AccountStatus.ACTIVE || !user.getIsVerified()) {
+                throw new BadRequestException("Cannot reset password. Your account must be active and verified.", HttpStatus.BAD_REQUEST);
+            }
+
+            otpService.sendAndSaveOtp(request.getEmail());
+            // Audit: Forgot Password Request Success
+            auditPublisherService.publishAudit(
+                    "FORGOT_PASSWORD_REQUEST", String.valueOf(user.getId()), String.valueOf(user.getId()),
+                    null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
+            );
+            return String.format("A password reset OTP has been sent to %s. Please verify it to proceed.", request.getEmail());
+        }catch (Exception e) {
+            // Audit: Forgot Password Request Failed
+            auditPublisherService.publishAudit(
+                    "FORGOT_PASSWORD_REQUEST", null, null,
+                    null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
+            throw e;
         }
-
-        otpService.sendAndSaveOtp(request.getEmail());
-        return String.format("A password reset OTP has been sent to %s. Please verify it to proceed.", request.getEmail());
     }
 
     @Override
-    public ForgetPasswordOtpVerifyResponse verifyForgotPasswordOtp(OtpVerifyRequest request) {
-        UserEntity user = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        String.format("Account not found with email: %s", request.getEmail()),
-                        HttpStatus.NOT_FOUND
-                ));
+    public ForgetPasswordOtpVerifyResponse verifyForgotPasswordOtp(OtpVerifyRequest request, HttpServletRequest httpServletRequest) {
 
-        boolean isVerified = otpService.verifyOtp(request.getEmail(), request.getOtp());
-        if (!isVerified) {
-            throw new BadRequestException("The OTP provided is invalid or has expired.", HttpStatus.BAD_REQUEST);
-        }
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
+        Map<String, Object> auditValue = Map.of("email", request.getEmail());
 
-        if (user.getAccountStatus() != AccountStatus.ACTIVE || !user.getIsVerified()) {
-            throw new BadRequestException("Account must be active and verified to verify OTP.", HttpStatus.BAD_REQUEST);
-        }
+        try {
+           UserEntity user = authRepository.findByEmail(request.getEmail())
+                   .orElseThrow(() -> new ResourceNotFoundException(
+                           String.format("Account not found with email: %s", request.getEmail()),
+                           HttpStatus.NOT_FOUND
+                   ));
 
-        String token = otpService.sendForgetPasswordToken(request.getEmail());
-        return new ForgetPasswordOtpVerifyResponse("OTP verified successfully. You can now reset your password.", token);
+           boolean isVerified = otpService.verifyOtp(request.getEmail(), request.getOtp());
+           if (!isVerified) {
+               throw new BadRequestException("The OTP provided is invalid or has expired.", HttpStatus.BAD_REQUEST);
+           }
+
+           if (user.getAccountStatus() != AccountStatus.ACTIVE || !user.getIsVerified()) {
+               throw new BadRequestException("Account must be active and verified to verify OTP.", HttpStatus.BAD_REQUEST);
+           }
+
+           String token = otpService.sendForgetPasswordToken(request.getEmail());
+           // Audit: Forgot Password OTP Verify Success
+           auditPublisherService.publishAudit(
+                   "VERIFY_FORGOT_PASSWORD_OTP", String.valueOf(user.getId()), String.valueOf(user.getId()),
+                   null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
+           );
+            return new ForgetPasswordOtpVerifyResponse("OTP verified successfully. You can now reset your password.", token);
+       } catch (Exception e) {
+           // Audit: Forgot Password OTP Verify Failed
+           auditPublisherService.publishAudit(
+                   "VERIFY_FORGOT_PASSWORD_OTP", null, null,
+                   null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+           );
+           throw e;
+       }
+
     }
 
     @Override
     @Transactional
-    public String resetPassword(ResetPasswordRequest request) {
-        UserEntity user = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        String.format("Account not found with email: %s", request.getEmail()),
-                        HttpStatus.NOT_FOUND
-                ));
+    public String resetPassword(ResetPasswordRequest request, HttpServletRequest httpServletRequest) {
+
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceInfo = httpServletRequest.getHeader("User-Agent");
+        Map<String, Object> auditValue = Map.of("email", request.getEmail());
+
+        try {
+            UserEntity user = authRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            String.format("Account not found with email: %s", request.getEmail()),
+                            HttpStatus.NOT_FOUND
+                    ));
 
 
-        boolean isTokenValid = otpService.verifyOtp(request.getEmail(), request.getResetToken());
-        if (!isTokenValid) {
-            throw new BadRequestException("Invalid or expired password reset token.", HttpStatus.BAD_REQUEST);
+            boolean isTokenValid = otpService.verifyOtp(request.getEmail(), request.getResetToken());
+            if (!isTokenValid) {
+                throw new BadRequestException("Invalid or expired password reset token.", HttpStatus.BAD_REQUEST);
+            }
+
+            if (user.getAccountStatus() != AccountStatus.ACTIVE || !user.getIsVerified()) {
+                throw new BadRequestException("Account must be active and verified to reset password.", HttpStatus.BAD_REQUEST);
+            }
+
+            user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+            authRepository.save(user);
+
+            // Audit: Reset Password Success
+            auditPublisherService.publishAudit(
+                    "PASSWORD_RESET", String.valueOf(user.getId()), String.valueOf(user.getId()),
+                    null, Map.of("status", "Password updated successfully"), "SUCCESS", ipAddress, deviceInfo, null
+            );
+            return "Your password has been successfully reset. Please log in with your new password.";
+
+        } catch (Exception e) {
+            // Audit: Reset Password Failed
+            auditPublisherService.publishAudit(
+                    "PASSWORD_RESET", null, null,
+                    null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
+            );
+            throw e;
         }
 
-        if (user.getAccountStatus() != AccountStatus.ACTIVE || !user.getIsVerified()) {
-            throw new BadRequestException("Account must be active and verified to reset password.", HttpStatus.BAD_REQUEST);
-        }
-
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        authRepository.save(user);
-
-        return "Your password has been successfully reset. Please log in with your new password.";
     }
 
     @Override

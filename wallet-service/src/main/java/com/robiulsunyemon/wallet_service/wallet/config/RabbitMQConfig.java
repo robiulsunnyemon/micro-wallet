@@ -42,6 +42,50 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.transaction-routing-key}")
     private String transactionRoutingKey;
 
+
+
+    @Value("${rabbitmq.audit-exchange}")
+    private String auditExchange;
+
+    @Value("${rabbitmq.audit-queue}")
+    private String auditQueue;
+
+    @Value("${rabbitmq.audit-routing-key}")
+    private String auditRoutingKey;
+
+
+    @Bean
+    public TopicExchange auditExchange() {
+        return new TopicExchange(auditExchange);
+    }
+
+
+    @Bean
+    public Queue auditQueue() {
+        return new Queue(auditQueue, true);
+    }
+
+
+    @Bean
+    public Binding auditBinding() {
+        return BindingBuilder
+                .bind(auditQueue())
+                .to(auditExchange())
+                .with(auditRoutingKey);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
     @Bean
     public Queue queue() {
         return new Queue(QUEUE_NAME, true);
