@@ -1,5 +1,4 @@
 package com.robiulsunyemon.transaction_service.transaction.controller;
-
 import com.robiulsunyemon.transaction_service.transaction.dto.GlobalResponse;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionRequest;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionResponse;
@@ -9,10 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
+
 
 @RestController
 @RequestMapping("/transactions")
@@ -31,6 +29,27 @@ public class TransactionController {
                 request.getRequestURI()
         );
     }
+
+    @GetMapping("/me")
+    public ResponseEntity<GlobalResponse<List<TransactionResponse>>> fetchAllMyTransactions(
+            @RequestHeader(value = "userId") Long userId,
+            HttpServletRequest request
+    ) {
+        if(userId==null){
+            return buildSuccessResponse(null, HttpStatus.UNAUTHORIZED,
+                    "Missing userId header", request.getRequestURI());
+        }
+
+        List<TransactionResponse> responses = transactionService.fetchMyTransaction(userId);
+        return buildSuccessResponse(
+                responses,
+                HttpStatus.OK,
+                "Transactions fetched successfully",
+                request.getRequestURI()
+        );
+    }
+
+
 
     @PostMapping
     public ResponseEntity<GlobalResponse<String>> createTransaction(

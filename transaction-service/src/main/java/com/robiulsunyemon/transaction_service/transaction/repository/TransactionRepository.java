@@ -3,9 +3,11 @@ import com.robiulsunyemon.transaction_service.transaction.entity.TransactionEnti
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<TransactionEntity, Long> {
     Optional<TransactionEntity>  findByTxId(String txId);
+    List<TransactionEntity> findByUserId(Long userId);
 }

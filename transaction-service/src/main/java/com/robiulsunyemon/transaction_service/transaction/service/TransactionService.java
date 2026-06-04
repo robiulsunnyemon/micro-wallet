@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface TransactionService {
     void createTransaction(Long userId, String role, TransactionRequest request, HttpServletRequest httpServletRequest);
     List<TransactionResponse> fetchTransaction();
+    List<TransactionResponse> fetchMyTransaction(Long userId);
     Optional<TransactionResponse> findByTransactionId(Long id);
     String deleteTransactionById(Long id);
     void updateTransactionStatus(TransactionEvent event);

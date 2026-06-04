@@ -30,7 +30,6 @@ public class RouteValidator {
         }
 
         if (method == HttpMethod.GET) {
-            // exact match ব্যবহার করা হয়েছে, যাতে /wallets/me কে public না ভাবা হয়
             boolean isPublicGet = publicGetEndpoints.stream().anyMatch(p -> path.equals(p) || path.equals(p + "/"));
             return !isPublicGet;
         }

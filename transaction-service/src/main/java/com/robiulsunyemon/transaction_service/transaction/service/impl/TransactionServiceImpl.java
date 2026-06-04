@@ -203,6 +203,11 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    public List<TransactionResponse> fetchMyTransaction(Long userId) {
+        return transactionRepository.findByUserId(userId).stream().map(transactionMapper::entityToResponse).toList();
+    }
+
+    @Override
     public Optional<TransactionResponse> findByTransactionId(Long id) {
         return Optional.empty();
     }
