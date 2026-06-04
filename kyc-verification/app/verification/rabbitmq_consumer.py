@@ -15,14 +15,14 @@ RABBITMQ_PASSWORD = "guest"
 RABBITMQ_VHOST    = "/"
 
 # consume
-EXCHANGE_NAME = "kyc.post.exchange"
-QUEUE_NAME    = "kyc.post.queue"
-ROUTING_KEY   = "kyc.post.routing.key"
+EXCHANGE_NAME = "kyc.exchange"
+QUEUE_NAME    = "kyc.verification.requested.queue"
+ROUTING_KEY   = "profile.kyc.verification.requested"
 
 # result
-RESULT_EXCHANGE    = "kyc.result.exchange"
-RESULT_QUEUE       = "kyc.result.queue"
-RESULT_ROUTING_KEY = "kyc.result.routing.key"
+RESULT_EXCHANGE    = "kyc.exchange"
+RESULT_QUEUE       = "profile.kyc.verification.completed.queue"
+RESULT_ROUTING_KEY = "kyc.verification.completed"
 
 
 # ─── Result Publisher ─────────────────────────────────────────────────────────

@@ -12,45 +12,45 @@ import org.springframework.context.annotation.Configuration;
 @Data
 public class RabbitMQConfig {
 
-    @Value("${rabbitmq.exchange}")
+    @Value("${rabbitmq.messaging.exchange}")
     private String exchangeName;
 
-    @Value("${rabbitmq.queue}")
+    @Value("${rabbitmq.messaging.queue}")
     private String queueName;
 
-    @Value("${rabbitmq.rollback-queue}")
+    @Value("${rabbitmq.messaging.rollback-queue}")
     private String rollBackQueue;
 
-    @Value("${rabbitmq.kyc-post-queue}")
+    @Value("${rabbitmq.messaging.kyc-post-queue}")
     private String kycPostQueue;
 
-    @Value("${rabbitmq.kyc-post-exchange}")
+    @Value("${rabbitmq.messaging.kyc-post-exchange}")
     private String kycPostExchange;
 
-    @Value("${rabbitmq.kyc-post-routing-key}")
+    @Value("${rabbitmq.messaging.kyc-post-routing-key}")
     private String kycPostRoutingKey;
 
-    @Value("${rabbitmq.routing-key-rollback}")
+    @Value("${rabbitmq.messaging.routing-key-rollback}")
     private String rollBackRouting;
 
-    @Value("${rabbitmq.kyc-result-exchange}")
+    @Value("${rabbitmq.messaging.kyc-result-exchange}")
     private String kycResultExchange;
 
-    @Value("${rabbitmq.kyc-result-queue}")
+    @Value("${rabbitmq.messaging.kyc-result-queue}")
     private String kycResultQueue;
 
-    @Value("${rabbitmq.kyc-result-routing-key}")
+    @Value("${rabbitmq.messaging.kyc-result-routing-key}")
     private String kycResultRoutingKey;
 
 
 
-    @Value("${rabbitmq.audit-exchange}")
+    @Value("${rabbitmq.messaging.audit-exchange}")
     private String auditExchange;
 
-    @Value("${rabbitmq.audit-queue}")
+    @Value("${rabbitmq.messaging.audit-queue}")
     private String auditQueue;
 
-    @Value("${rabbitmq.audit-routing-key}")
+    @Value("${rabbitmq.messaging.audit-routing-key}")
     private String auditRoutingKey;
 
 

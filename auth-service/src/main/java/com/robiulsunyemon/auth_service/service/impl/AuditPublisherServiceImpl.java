@@ -17,10 +17,10 @@ public class AuditPublisherServiceImpl implements AuditPublisherService {
 
     private final RabbitTemplate rabbitTemplate;
 
-    @Value("${rabbitmq.audit-exchange}")
+    @Value("${rabbitmq.messaging.audit-exchange}")
     private String exchangeName;
 
-    @Value("${rabbitmq.audit-routing-key}")
+    @Value("${rabbitmq.messaging.audit-routing-key}")
     private String routingKey;
 
 

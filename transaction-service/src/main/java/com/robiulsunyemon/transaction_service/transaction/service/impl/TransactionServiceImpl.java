@@ -1,5 +1,6 @@
 package com.robiulsunyemon.transaction_service.transaction.service.impl;
 import com.robiulsunyemon.transaction_service.transaction.clients.WalletClient;
+import com.robiulsunyemon.transaction_service.transaction.dto.TransactionEvent;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionRequest;
 import com.robiulsunyemon.transaction_service.transaction.dto.TransactionResponse;
 import com.robiulsunyemon.transaction_service.transaction.entity.*;
@@ -36,10 +37,10 @@ public class TransactionServiceImpl implements TransactionService {
     private final AuditPublisherService auditPublisherService;
 
 
-    @Value("${rabbitmq.exchange}")
+    @Value("${rabbitmq.messaging.exchange}")
     private String exchange;
 
-    @Value("${rabbitmq.routing-key}")
+    @Value("${rabbitmq.messaging.routing-key}")
     private String routingKey;
 
     @Override
@@ -107,13 +108,29 @@ public class TransactionServiceImpl implements TransactionService {
                     "tx_type", savedTransaction.getTxType().name(),
                     "status", "PENDING"
             );
+
+
+            TransactionEvent transactionEvent=TransactionEvent.builder()
+                    .txId(savedTransaction.getTxId())
+                    .amount(savedTransaction.getAmount())
+                    .charge(savedTransaction.getCharge())
+                    .commission(savedTransaction.getCommission())
+                    .failureReason(savedTransaction.getFailureReason())
+                    .ipAddress(ipAddress)
+                    .receiverUserId(savedTransaction.getReceiverUserId())
+                    .senderUserId(savedTransaction.getSenderUserId())
+                    .txStatus(savedTransaction.getTxStatus())
+                    .txType(savedTransaction.getTxType())
+                    .build();
+
+
             auditPublisherService.publishAudit(
                     "TRANSACTION_INITIATE", String.valueOf(userId), savedTransaction.getTxId(),
                     null, auditDetails, "SUCCESS", ipAddress, deviceInfo, null
             );
 
             try {
-                rabbitTemplate.convertAndSend(exchange, routingKey, savedTransaction);
+                rabbitTemplate.convertAndSend(exchange, routingKey, transactionEvent);
                 log.info("Successfully published transaction message to RabbitMQ exchange: {}", exchange);
             } catch (Exception e) {
                 log.error("Failed to send transaction message to RabbitMQ for TxId: {}", savedTransaction.getTxId(), e);
@@ -197,7 +214,7 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
-    public void updateTransactionStatus(TransactionEntity event) {
+    public void updateTransactionStatus(TransactionEvent event) {
         log.info("Updating final transaction status in database for TxId: {}", event.getTxId());
 
         TransactionEntity transaction = transactionRepository.findByTxId(event.getTxId())

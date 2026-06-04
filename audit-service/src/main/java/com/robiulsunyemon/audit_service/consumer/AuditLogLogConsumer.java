@@ -13,7 +13,7 @@ public class AuditLogLogConsumer {
 
     private final AuditLogService auditLogService;
 
-    @RabbitListener(queues = "${rabbitmq.queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.queue}")
     public void consumeAuditMessage(AuditLogCollection auditLog) {
         log.info("Received audit message from service: {} for action: {}",
                 auditLog.getServiceName(), auditLog.getActionType());

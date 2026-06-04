@@ -1,4 +1,4 @@
-package com.robiulsunyemon.wallet_service.wallet.entity;
+package com.robiulsunyemon.fraud_detection_service.dto;
 
 public enum FailureReasonType {
     NONE,

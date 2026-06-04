@@ -1,12 +1,15 @@
-package com.robiulsunyemon.auth_service.config;
+package com.robiulsunyemon.transaction_service.transaction.config;
+
 import lombok.Data;
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.beans.factory.annotation.Value;
-
 
 @Configuration
 @Data
@@ -15,22 +18,14 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.messaging.exchange}")
     private String exchangeName;
 
-    @Value("${rabbitmq.messaging.otp-queue}")
-    private String otpQueue;
+    @Value("${rabbitmq.messaging.routing-key}")
+    private String routingKey;
 
     @Value("${rabbitmq.messaging.rollback-queue}")
-    private String rollbackWalletQueue;
+    private String rollbackQueueName;
 
-    @Value("${rabbitmq.messaging.wallet-queue}")
-    private String walletQueue;
-
-    @Value("${rabbitmq.messaging.routing-key-otp}")
-    private String routingKeyOtp;
-
-
-    @Value("${rabbitmq.messaging.routing-key-wallet}")
-    private String routingKeyWallet;
-
+    @Value("${rabbitmq.messaging.rollback-routing-key}")
+    private String rollbackRoutingKey;
 
     @Value("${rabbitmq.messaging.audit-exchange}")
     private String auditExchange;
@@ -41,18 +36,15 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.messaging.audit-routing-key}")
     private String auditRoutingKey;
 
-
     @Bean
     public TopicExchange auditExchange() {
         return new TopicExchange(auditExchange);
     }
 
-
     @Bean
     public Queue auditQueue() {
         return new Queue(auditQueue, true);
     }
-
 
     @Bean
     public Binding auditBinding() {
@@ -62,45 +54,28 @@ public class RabbitMQConfig {
                 .with(auditRoutingKey);
     }
 
-
-
-
     @Bean
-    public DirectExchange exchange(){
-        return new DirectExchange(exchangeName);
-    }
-
-
-    @Bean
-    public Queue otpQueue(){
-        return new Queue(otpQueue,true);
+    public TopicExchange transactionExchange() {
+        return new TopicExchange(exchangeName);
     }
 
     @Bean
-    public Queue walletQueue(){
-        return new Queue(walletQueue,true);
+    public Queue transactionRollbackQueue() {
+        return new Queue(rollbackQueueName, true);
     }
 
     @Bean
-    public Queue rollbackWalletQueue(){
-        return new Queue(rollbackWalletQueue,true);
+    public Binding transactionRollbackBinding() {
+        return BindingBuilder
+                .bind(transactionRollbackQueue())
+                .to(transactionExchange())
+                .with(rollbackRoutingKey);
     }
-
-    @Bean
-    public Binding otpBinding(){
-        return BindingBuilder.bind(otpQueue()).to(exchange()).with(routingKeyOtp);
-
-    }
-
-    @Bean
-    public Binding walletBinding(){
-        return BindingBuilder.bind(walletQueue()).to(exchange()).with(routingKeyWallet);
-    }
-
+    
+    // Binding is not strictly necessary for rollback queue here since wallet-service binds it, but good for safety.
 
     @Bean
     public MessageConverter converter() {
         return new Jackson2JsonMessageConverter();
     }
-
 }

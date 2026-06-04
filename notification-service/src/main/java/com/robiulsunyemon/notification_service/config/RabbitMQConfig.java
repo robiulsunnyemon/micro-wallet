@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 @Data
 public class RabbitMQConfig {
 
-    @Value("${rabbitmq.queue}")
+    @Value("${rabbitmq.messaging.queue}")
     private String QUEUE_NAME;
 
     @Bean

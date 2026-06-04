@@ -13,7 +13,7 @@ public class NotificationConsumerImpl implements NotificationConsumer {
     private JavaMailSender mailSender;
 
 
-    @RabbitListener(queues = "${rabbitmq.queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.queue}")
     @Override
     public void consumeAndSendEmail(EmailMessage message) {
         try {

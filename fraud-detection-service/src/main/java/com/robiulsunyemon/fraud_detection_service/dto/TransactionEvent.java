@@ -1,12 +1,6 @@
-package com.robiulsunyemon.wallet_service.wallet.dto;
-import com.robiulsunyemon.wallet_service.wallet.entity.CurrencyType;
-import com.robiulsunyemon.wallet_service.wallet.entity.FailureReasonType;
-import com.robiulsunyemon.wallet_service.wallet.entity.TransactionStatus;
-import com.robiulsunyemon.wallet_service.wallet.entity.TransactionType;
+package com.robiulsunyemon.fraud_detection_service.dto;
 import lombok.Data;
-
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Data
 public class TransactionEvent {

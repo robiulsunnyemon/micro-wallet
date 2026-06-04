@@ -1,14 +1,13 @@
-package com.robiulsunyemon.wallet_service.wallet.dto;
-import com.robiulsunyemon.wallet_service.wallet.entity.CurrencyType;
-import com.robiulsunyemon.wallet_service.wallet.entity.FailureReasonType;
-import com.robiulsunyemon.wallet_service.wallet.entity.TransactionStatus;
-import com.robiulsunyemon.wallet_service.wallet.entity.TransactionType;
+package com.robiulsunyemon.transaction_service.transaction.dto;
+import com.robiulsunyemon.transaction_service.transaction.entity.FailureReasonType;
+import com.robiulsunyemon.transaction_service.transaction.entity.TransactionStatus;
+import com.robiulsunyemon.transaction_service.transaction.entity.TransactionType;
+import lombok.Builder;
 import lombok.Data;
-
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Data
+@Builder
 public class TransactionEvent {
     private String txId;
     private Long senderUserId;

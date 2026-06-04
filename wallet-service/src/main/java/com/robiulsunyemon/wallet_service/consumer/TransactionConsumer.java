@@ -14,7 +14,7 @@ public class TransactionConsumer {
 
     private final WalletService walletService;
 
-    @RabbitListener(queues = "${rabbitmq.transaction-wallet-queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.transaction-wallet-queue}")
     public void consumeTransactionMessage(TransactionEvent event) {
         log.info("Received transaction message from Queue for TxId: {}", event.getTxId());
         try {

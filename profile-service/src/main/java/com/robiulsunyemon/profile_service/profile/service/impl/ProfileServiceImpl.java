@@ -44,7 +44,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final Cloudinary cloudinary;
     private final AuditPublisherService auditPublisherService;
 
-    @RabbitListener(queues = "${rabbitmq.queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.queue}")
     @Override
     public void createProfile(WalletCreatedMessage request) {
         try {

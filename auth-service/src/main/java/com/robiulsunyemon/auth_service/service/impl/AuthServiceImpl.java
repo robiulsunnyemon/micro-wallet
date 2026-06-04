@@ -186,7 +186,7 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    @RabbitListener(queues = "${rabbitmq.rollback-queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.rollback-queue}")
     @Override
     public void handleRegistrationStatusUpdate(RegistrationStatusMessage statusMessage) {
         System.out.println("successfully come registration status update message");

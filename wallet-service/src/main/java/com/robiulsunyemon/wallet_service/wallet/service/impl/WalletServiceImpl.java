@@ -36,14 +36,14 @@ public class WalletServiceImpl implements WalletService {
     private final AuditPublisherService auditPublisherService;
 
 
-    @Value("${rabbitmq.transaction-exchange}")
+    @Value("${rabbitmq.messaging.transaction-exchange}")
     private String exchange;
 
-    @Value("${rabbitmq.transaction-rollback-routing-key}")
+    @Value("${rabbitmq.messaging.transaction-rollback-routing-key}")
     private String rollbackRoutingKey;
 
     @Override
-    @RabbitListener(queues = "${rabbitmq.queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.queue}")
     public void createWallet(UserCreatedMessage userCreatedMessage) {
         try {
             if(walletRepository.findByUserId(userCreatedMessage.getUserId()).isPresent()) {
@@ -110,7 +110,7 @@ public class WalletServiceImpl implements WalletService {
         }
     }
 
-    @RabbitListener(queues = "${rabbitmq.rollback-queue-profile}")
+    @RabbitListener(queues = "${rabbitmq.messaging.rollback-queue-profile}")
     @Override
     public void handleProfileRegistrationStatusUpdate(RegistrationStatusMessage statusMessage) {
         try{

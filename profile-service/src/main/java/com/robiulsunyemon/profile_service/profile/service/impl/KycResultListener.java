@@ -17,7 +17,7 @@ public class KycResultListener {
 
     private final ProfileRepository profileRepository;
 
-    @RabbitListener(queues = "${rabbitmq.kyc-result-queue}")
+    @RabbitListener(queues = "${rabbitmq.messaging.kyc-result-queue}")
     public void onKycResult(KycResultMessage result) {
         log.info("[KycResult] Received → userId={}, verified={}, distance={}",
                 result.getUserId(), result.isVerified(), result.getDistance());

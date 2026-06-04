@@ -15,42 +15,42 @@ import org.springframework.context.annotation.Configuration;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RabbitMQConfig {
-    @Value("${rabbitmq.queue}")
+    @Value("${rabbitmq.messaging.queue}")
     private String QUEUE_NAME;
-    @Value("${rabbitmq.profile-queue}")
+    @Value("${rabbitmq.messaging.profile-queue}")
     private String PROFILE_QUEUE_NAME;
-    @Value("${rabbitmq.rollback-queue}")
+    @Value("${rabbitmq.messaging.rollback-queue}")
     private String ROLLBACK_QUEUE_NAME;
 
-    @Value("${rabbitmq.rollback-queue-profile}")
+    @Value("${rabbitmq.messaging.rollback-queue-profile}")
     private String ROLLBACK_PROFILE_QUEUE_NAME;
-    @Value("${rabbitmq.exchange}")
+    @Value("${rabbitmq.messaging.exchange}")
     private String EXCHANGE_NAME;
-    @Value("${rabbitmq.routing-key}")
+    @Value("${rabbitmq.messaging.routing-key}")
     private String ROUTING_KEY;
 
-    @Value("${rabbitmq.rollback-routing-key}")
+    @Value("${rabbitmq.messaging.rollback-routing-key}")
     private String ROLLBACK_ROUTING_KEY;
 
 
-    @Value("${rabbitmq.transaction-exchange}")
+    @Value("${rabbitmq.messaging.transaction-exchange}")
     private String transactionExchangeName;
 
-    @Value("${rabbitmq.transaction-wallet-queue}")
+    @Value("${rabbitmq.messaging.transaction-wallet-queue}")
     private String transactionWalletQueueName;
 
-    @Value("${rabbitmq.transaction-routing-key}")
+    @Value("${rabbitmq.messaging.transaction-routing-key}")
     private String transactionRoutingKey;
 
 
 
-    @Value("${rabbitmq.audit-exchange}")
+    @Value("${rabbitmq.messaging.audit-exchange}")
     private String auditExchange;
 
-    @Value("${rabbitmq.audit-queue}")
+    @Value("${rabbitmq.messaging.audit-queue}")
     private String auditQueue;
 
-    @Value("${rabbitmq.audit-routing-key}")
+    @Value("${rabbitmq.messaging.audit-routing-key}")
     private String auditRoutingKey;
 
 
