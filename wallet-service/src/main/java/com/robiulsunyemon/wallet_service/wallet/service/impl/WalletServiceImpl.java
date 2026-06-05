@@ -106,7 +106,7 @@ public class WalletServiceImpl implements WalletService {
             );
             RegistrationStatusMessage rollbackMessage=new RegistrationStatusMessage(false,userCreatedMessage.getUserId());
             rabbitTemplate.convertAndSend(rabbitMQConfig.getEXCHANGE_NAME(),rabbitMQConfig.getROLLBACK_ROUTING_KEY(),rollbackMessage);
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 
@@ -140,7 +140,7 @@ public class WalletServiceImpl implements WalletService {
                 );
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 
@@ -245,7 +245,7 @@ public class WalletServiceImpl implements WalletService {
            );
 
            sendRollbackMessage(event, FailureReasonType.SYSTEM_ERROR);
-           throw new RuntimeException(e);
+           throw e;
        }
 
     }

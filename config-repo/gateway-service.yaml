@@ -27,25 +27,25 @@ spring:
             - id: wallet-service
               uri: lb://WALLET-SERVICE
               predicates:
-                - Path=/wallets/**
+                - Path=/api/v1/wallets/**
               filters:
                 - AuthenticationFilter
             - id: profile-service
               uri: lb://PROFILE-SERVICE
               predicates:
-                - Path=/profiles/**
+                - Path=/api/v1/profiles/**
               filters:
                 - AuthenticationFilter
             - id: transaction-service
               uri: lb://TRANSACTION-SERVICE
               predicates:
-                - Path=/transactions/**
+                - Path=/api/v1/transactions/**
               filters:
                 - AuthenticationFilter
             - id: audit-service
               uri: lb://AUDIT-SERVICE
               predicates:
-                - Path=/audit/**
+                - Path=/api/v1/audit/**
               filters:
                 - AuthenticationFilter
 

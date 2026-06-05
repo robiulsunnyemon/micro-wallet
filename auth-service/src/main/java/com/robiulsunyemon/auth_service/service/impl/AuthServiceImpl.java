@@ -84,13 +84,13 @@ public class AuthServiceImpl implements AuthService {
 
             otpService.sendAndSaveOtp(request.getEmail());
             return response;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             // Audit: failed signup
             auditPublisherService.publishAudit(
                     "USER_SIGNUP", null, null,
                     null, auditNewValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
             );
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 
@@ -139,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
                     "USER_LOGIN", null, null,
                     null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
             );
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 
@@ -175,14 +175,14 @@ public class AuthServiceImpl implements AuthService {
             );
             return "OTP verified successfully. Your account is now active.";
 
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             System.out.println("Error occur from auth service. No message delivery from auth service. because: "+e);
             // Audit: Failed OTP Verification
             auditPublisherService.publishAudit(
                     "OTP_VERIFY", null, null,
                     null, auditValue, "FAILED", ipAddress, deviceInfo, e.getMessage()
             );
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 
@@ -228,7 +228,7 @@ public class AuthServiceImpl implements AuthService {
                     null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
             );
             return String.format("OTP has been successfully resent to your email: %s", request.getEmail());
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             // Audit: Resend OTP Failed
             auditPublisherService.publishAudit(
                     "RESEND_OTP", null, null,
@@ -264,7 +264,7 @@ public class AuthServiceImpl implements AuthService {
                     null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
             );
             return String.format("A password reset OTP has been sent to %s. Please verify it to proceed.", request.getEmail());
-        }catch (Exception e) {
+        } catch (RuntimeException e) {
             // Audit: Forgot Password Request Failed
             auditPublisherService.publishAudit(
                     "FORGOT_PASSWORD_REQUEST", null, null,
@@ -304,7 +304,7 @@ public class AuthServiceImpl implements AuthService {
                    null, auditValue, "SUCCESS", ipAddress, deviceInfo, null
            );
             return new ForgetPasswordOtpVerifyResponse("OTP verified successfully. You can now reset your password.", token);
-       } catch (Exception e) {
+       } catch (RuntimeException e) {
            // Audit: Forgot Password OTP Verify Failed
            auditPublisherService.publishAudit(
                    "VERIFY_FORGOT_PASSWORD_OTP", null, null,
@@ -350,7 +350,7 @@ public class AuthServiceImpl implements AuthService {
             );
             return "Your password has been successfully reset. Please log in with your new password.";
 
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             // Audit: Reset Password Failed
             auditPublisherService.publishAudit(
                     "PASSWORD_RESET", null, null,

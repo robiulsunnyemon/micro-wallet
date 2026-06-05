@@ -89,7 +89,7 @@ public class ProfileServiceImpl implements ProfileService {
             RegistrationStatusMessage statusMessage=new RegistrationStatusMessage(false,request.getUserId());
             rabbitTemplate.convertAndSend(rabbitMQConfig.getExchangeName(),rabbitMQConfig.getRollBackRouting(),statusMessage);
             System.out.println("Error occur from profile service. No message received from wallet service. because: "+e);
-            throw new RuntimeException(e);
+            throw new e;
         }
 
     }
@@ -170,12 +170,13 @@ public class ProfileServiceImpl implements ProfileService {
                             null, null, "FAILED", "ASYNC_TASK", "Nid_OCR_Service", e.getMessage()
                     );
                     System.err.println("Background NID processing failed: " + e.getMessage());
+                    throw e;
                 }
             });
 
             CompletableFuture.completedFuture(null);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to read image bytes", e);
+            throw e;
         }
     }
 
@@ -231,6 +232,7 @@ public class ProfileServiceImpl implements ProfileService {
                             null, null, "FAILED", "ASYNC_TASK", "KYC_Dispatch_Handler", e.getMessage()
                     );
                     System.err.println("Background NID processing failed: " + e.getMessage());
+                    throw e;
                 }
             });
 
@@ -238,7 +240,7 @@ public class ProfileServiceImpl implements ProfileService {
 
         } catch (IOException e) {
 
-            throw new RuntimeException("Failed to upload the selfie to Cloudinary.", e);
+            throw new e;
         }
     }
 
