@@ -16,8 +16,8 @@ spring:
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:rabbitmq-server}
     port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${RMQ_USER:guest}
-    password: ${RMQ_PASSWORD:guest}
+    username: ${RABBIT_USER:guest}
+    password: ${RABBIT_PASSWORD:guest}
 
 rabbitmq:
   messaging:

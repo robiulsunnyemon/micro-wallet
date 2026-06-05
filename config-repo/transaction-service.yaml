@@ -15,8 +15,8 @@ rabbitmq:
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres-db:5432/transaction}
-    username: ${CORE_DB_USER}
-    password: ${CORE_DB_PASSWORD}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -28,8 +28,8 @@ spring:
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:rabbitmq-server}
     port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${RMQ_USER:guest}
-    password: ${RMQ_PASSWORD:guest}
+    username: ${RABBIT_USER:guest}
+    password: ${RABBIT_PASSWORD:guest}
 
 eureka:
   client:
