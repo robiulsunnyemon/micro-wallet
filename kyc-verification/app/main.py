@@ -28,7 +28,7 @@ async def lifespan(_: FastAPI):
         eureka_server=settings.EUREKA_SERVER,
         app_name=settings.APP_NAME,
         instance_port=settings.APP_PORT,
-        instance_host="localhost",
+        instance_host=settings.APP_HOST,
     )
     logger.info("[Lifespan] Eureka registration complete ✓")
     logger.info("[Lifespan] Starting RabbitMQ consumer...")

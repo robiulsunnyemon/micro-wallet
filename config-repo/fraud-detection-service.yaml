@@ -1,0 +1,34 @@
+server:
+  port: 8088
+
+rabbitmq:
+  messaging:
+    exchange: transaction.exchange
+    fraud-queue: fraud.transaction.check.requested.queue
+    fraud-rollback-queue: transaction.fraud.processed.queue
+    fraud-routing-key: transaction.fraud.check.requested
+    wallet-routing-key: transaction.fraud.check.passed
+    rollback-routing-key: transaction.wallet.processed
+    audit-exchange: audit.exchange
+    audit-queue: audit.log.created.queue
+    audit-routing-key: audit.log.created
+
+spring:
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:redis-server}
+      port: ${SPRING_REDIS_PORT:6379}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq-server}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${RMQ_USER:guest}
+    password: ${RMQ_PASSWORD:guest}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://discovery-service:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true

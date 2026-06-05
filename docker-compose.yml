@@ -1,0 +1,291 @@
+
+services:
+  # ============================================================================
+  # --- INFRASTRUCTURE SERVICES ---
+  # ============================================================================
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    ports:
+      - "5432:5432"
+    environment:
+
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - wallet-network
+
+  mongodb-server:
+    image: mongo:6.0
+    container_name: mongodb-server
+    ports:
+      - "27017:27017"
+    environment:
+
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - wallet-network
+
+  redis-server:
+    image: redis:7-alpine
+    container_name: redis-server
+    ports:
+      - "6379:6379"
+    networks:
+      - wallet-network
+
+  rabbitmq-server:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq-server
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - wallet-network
+
+  # ============================================================================
+  # --- SPRING CLOUD PLATFORM ---
+  # ============================================================================
+  discovery-service:
+    build: ./discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8761/"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    networks:
+      - wallet-network
+
+  config-service:
+    build: ./config-service
+    container_name: config-service
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config-repo:/config-repo
+    environment:
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+      - CONFIG_REPO_PATH=/config-repo
+      - CORE_DB_USER=${DB_USER}
+      - CORE_DB_PASSWORD=${DB_PASSWORD}
+      - MONGO_USER=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_PWD=${MONGO_INITDB_ROOT_PASSWORD}
+      - RMQ_USER=${RABBIT_USER}
+      - RMQ_PASSWORD=${RABBIT_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - MAIL_USER=${MAIL_USER}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - GEMINI_KEY=${GEMINI_API_KEY}
+      - CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUD_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUD_API_SECRET=${CLOUDINARY_API_SECRET}
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888/auth-service/default"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    networks:
+      - wallet-network
+
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8200:8200"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - wallet-network
+
+  # ============================================================================
+  # --- MICROSERVICES (Cleaned up Environment Variables) ---
+  # ============================================================================
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "8082:8082"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      postgres-db:
+        condition: service_healthy
+      redis-server:
+        condition: service_started
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  profile-service:
+    build: ./profile-service
+    container_name: profile-service
+    ports:
+      - "8089:8089"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      postgres-db:
+        condition: service_healthy
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  wallet-service:
+    build: ./wallet-service
+    container_name: wallet-service
+    ports:
+      - "8011:8011"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      postgres-db:
+        condition: service_healthy
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  transaction-service:
+    build: ./transaction-service
+    container_name: transaction-service
+    ports:
+      - "8012:8012"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      postgres-db:
+        condition: service_healthy
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  fraud-detection-service:
+    build: ./fraud-detection-service
+    container_name: fraud-detection-service
+    ports:
+      - "8088:8088"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      redis-server:
+        condition: service_started
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    ports:
+      - "8010:8010"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  audit-service:
+    build: ./audit-service
+    container_name: audit-service
+    ports:
+      - "8017:8017"
+    environment:
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+      mongodb-server:
+        condition: service_started
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+  kyc-verification:
+    build: ./kyc-verification
+    container_name: kyc-verification
+    ports:
+      - "8000:8000"
+    environment:
+      - EUREKA_SERVER=http://discovery-service:8761/eureka/
+      - RABBITMQ_HOST=rabbitmq-server
+      - APP_HOST=0.0.0.0
+
+      - RABBIT_USER=${RABBIT_USER}
+      - RABBIT_PASSWORD=${RABBIT_PASSWORD}
+      - GEMINI_KEY=${GEMINI_API_KEY}
+    env_file:
+      - ./kyc-verification/.env
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      rabbitmq-server:
+        condition: service_started
+    networks:
+      - wallet-network
+
+# ============================================================================
+# --- NETWORKS & VOLUMES ---
+# ============================================================================
+networks:
+  wallet-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:
+  rabbitmq_data:

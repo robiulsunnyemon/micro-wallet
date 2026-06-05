@@ -1,0 +1,56 @@
+server:
+  port: 8089
+
+rabbitmq:
+  messaging:
+    queue: profile.wallet.created.queue
+    exchange: profile.exchange
+    rollback-queue: wallet.profile.kyc.rollback.queue
+    routing-key-rollback: profile.kyc.rollback
+    kyc-post-exchange: kyc.exchange
+    kyc-post-queue: kyc.verification.requested.queue
+    kyc-post-routing-key: profile.kyc.verification.requested
+    kyc-result-exchange: kyc.exchange
+    kyc-result-queue: profile.kyc.verification.completed.queue
+    kyc-result-routing-key: kyc.verification.completed
+    audit-exchange: audit.exchange
+    audit-queue: audit.log.created.queue
+    audit-routing-key: audit.log.created
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres-db:5432/profile_db}
+    username: ${CORE_DB_USER}
+    password: ${CORE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq-server}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${RMQ_USER:guest}
+    password: ${RMQ_PASSWORD:guest}
+
+gemini:
+  api:
+    url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent}
+    key: ${GEMINI_KEY}
+
+cloudinary:
+  cloud-name: ${CLOUD_NAME}
+  api-key: ${CLOUD_API_KEY}
+  api-secret: ${CLOUD_API_SECRET}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://discovery-service:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true

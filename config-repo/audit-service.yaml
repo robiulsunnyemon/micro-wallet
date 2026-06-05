@@ -1,0 +1,27 @@
+server:
+  port: 8017
+
+rabbitmq:
+  messaging:
+    exchange: audit.exchange
+    queue: audit.log.created.queue
+    routing-key: audit.log.created
+
+spring:
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb-server:27017/audit_db}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq-server}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${RMQ_USER:guest}
+    password: ${RMQ_PASSWORD:guest}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://discovery-service:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
