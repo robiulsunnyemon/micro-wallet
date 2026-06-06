@@ -280,4 +280,23 @@ The project implements a centralized `@RestControllerAdvice` (`GlobalExceptions.
 ```
 
 ---
+## 🧩 Saga Pattern (Distributed Transactions)
+
+The system implements the **Saga pattern** to achieve eventual consistency across microservices for critical operations like wallet creation, fund transfers, and profile updates. Each saga consists of a series of **local transactions** (executed by individual services) followed by **compensating actions** (rollback) in case of failure.
+
+### How it works
+1. **Orchestration** – The `Transaction Service` acts as the orchestrator, publishing events to RabbitMQ.
+2. **Local actions** – Services (Auth, Profile, Wallet, Transaction, etc.) consume the event and perform their own database updates.
+3. **Failure detection** – If a service encounters an error (e.g., insufficient balance, validation failure), it sends a **rollback message** to a dedicated rollback queue (`${rabbitmq.messaging.rollback-queue}`) using a routing key `${rabbitmq.messaging.rollback-routing-key}`.
+4. **Compensation** – Other services listen on the rollback queue (`TransactionSagaConsumer`, `WalletServiceImpl`, `ProfileServiceImpl`, etc.) and execute compensating transactions to revert the changes, ensuring data consistency.
+
+### Key components
+- **Rollback Queues** – Defined per service (`rollback-queue`, `rollback-queue-profile`, etc.) in each `RabbitMQConfig.java`.
+- **Rollback Routing Keys** – Shared routing key `${rabbitmq.messaging.rollback-routing-key}` used to route compensation messages.
+- **Compensating Services** – Implemented in `WalletServiceImpl.sendRollbackMessage`, `ProfileServiceImpl`, and `TransactionSagaConsumer`.
+- **Event‑driven communication** – All saga steps are asynchronous via RabbitMQ, providing resilience and loose coupling.
+
+> The saga implementation enables the system to handle complex, multi‑service transactions without a centralized XA transaction manager, while still guaranteeing eventual consistency.
+
+---
 *Developed with using Spring Boot & Microservices Architecture.*
